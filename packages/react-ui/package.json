@@ -1,8 +1,11 @@
 {
   "type": "module",
-  "name": "@openuidev/react-ui",
+  "name": "@sarasanalytics-com/openui-react-ui",
   "license": "MIT",
-  "version": "0.11.8",
+  "version": "0.11.9",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Component library for Generative UI SDK",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
@@ -93,8 +96,8 @@
     "ci": "pnpm run lint:check && pnpm run format:check && pnpm run test"
   },
   "peerDependencies": {
-    "@openuidev/react-headless": "workspace:^",
-    "@openuidev/react-lang": "workspace:^",
+    "@openuidev/react-headless": "^0.8.2",
+    "@openuidev/react-lang": "^0.2.6",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zustand": "catalog:",
