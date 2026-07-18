@@ -59,6 +59,10 @@ export interface LineChartProps<T extends LineChartData> {
   height?: number;
   width?: number;
   strokeWidth?: number;
+  /** Formats Y-axis tick labels (e.g. `(v) => "$" + v.toFixed(2)`). */
+  yAxisTickFormatter?: (value: number) => string;
+  /** Formats tooltip values per-series, keyed on the series `dataKey`. */
+  tooltipValueFormatter?: (value: number | string, dataKey: string) => React.ReactNode;
 }
 
 const X_AXIS_PADDING = 36;
@@ -82,6 +86,8 @@ export const LineChart = <T extends LineChartData>({
   height,
   width,
   strokeWidth = 2,
+  yAxisTickFormatter,
+  tooltipValueFormatter,
 }: LineChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -289,6 +295,10 @@ export const LineChart = <T extends LineChartData>({
             width={yAxisWidth}
             tickLine={false}
             axisLine={false}
+            // tickFormatter must live on YAxis itself: Recharts clones the tick
+            // element and injects the axis' own tickFormatter, clobbering one
+            // set directly on the child.
+            tickFormatter={yAxisTickFormatter}
             tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
           {/* Invisible lines to maintain scale synchronization */}
@@ -320,6 +330,7 @@ export const LineChart = <T extends LineChartData>({
     isAnimationActive,
     maxLabelHeight,
     yAxisWidth,
+    yAxisTickFormatter,
   ]);
 
   return (
@@ -385,7 +396,12 @@ export const LineChart = <T extends LineChartData>({
                   />
 
                   <ChartTooltip
-                    content={<CustomTooltipContent parentRef={mainContainerRef} />}
+                    content={
+                      <CustomTooltipContent
+                        parentRef={mainContainerRef}
+                        valueFormatter={tooltipValueFormatter}
+                      />
+                    }
                     offset={15}
                   />
 

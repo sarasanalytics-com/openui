@@ -60,6 +60,10 @@ export interface AreaChartProps<T extends AreaChartData> {
   className?: string;
   height?: number;
   width?: number;
+  /** Formats Y-axis tick labels (e.g. `(v) => "$" + v.toFixed(2)`). */
+  yAxisTickFormatter?: (value: number) => string;
+  /** Formats tooltip values per-series, keyed on the series `dataKey`. */
+  tooltipValueFormatter?: (value: number | string, dataKey: string) => React.ReactNode;
 }
 
 const X_AXIS_PADDING = 36;
@@ -82,6 +86,8 @@ const AreaChartComponent = <T extends AreaChartData>({
   className,
   height,
   width,
+  yAxisTickFormatter,
+  tooltipValueFormatter,
 }: AreaChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -288,6 +294,10 @@ const AreaChartComponent = <T extends AreaChartData>({
             width={yAxisWidth}
             tickLine={false}
             axisLine={false}
+            // tickFormatter must live on YAxis itself: Recharts clones the tick
+            // element and injects the axis' own tickFormatter, clobbering one
+            // set directly on the child.
+            tickFormatter={yAxisTickFormatter}
             tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
           {/* Invisible area to maintain scale synchronization */}
@@ -307,7 +317,17 @@ const AreaChartComponent = <T extends AreaChartData>({
         </RechartsAreaChart>
       </div>
     );
-  }, [showYAxis, chartHeight, data, dataKeys, variant, id, maxLabelHeight, yAxisWidth]);
+  }, [
+    showYAxis,
+    chartHeight,
+    data,
+    dataKeys,
+    variant,
+    id,
+    maxLabelHeight,
+    yAxisWidth,
+    yAxisTickFormatter,
+  ]);
 
   return (
     <LabelTooltipProvider>
@@ -372,7 +392,12 @@ const AreaChartComponent = <T extends AreaChartData>({
                   />
 
                   <ChartTooltip
-                    content={<CustomTooltipContent parentRef={mainContainerRef} />}
+                    content={
+                      <CustomTooltipContent
+                        parentRef={mainContainerRef}
+                        valueFormatter={tooltipValueFormatter}
+                      />
+                    }
                     offset={15}
                   />
 

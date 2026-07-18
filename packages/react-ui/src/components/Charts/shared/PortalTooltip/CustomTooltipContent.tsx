@@ -18,6 +18,7 @@ type CustomTooltipContentProps = React.ComponentProps<typeof RechartsPrimitive.T
     showPercentage?: boolean;
     portalContainer?: React.RefObject<HTMLElement | null>;
     parentRef: React.RefObject<HTMLElement | null>;
+    valueFormatter?: (value: number | string, dataKey: string) => React.ReactNode;
   };
 
 /**
@@ -45,6 +46,7 @@ function CustomTooltipContentRender(
     showPercentage = false,
     portalContainer,
     parentRef,
+    valueFormatter,
   } = props;
 
   const { config, id } = useChart();
@@ -159,10 +161,20 @@ function CustomTooltipContentRender(
                       showPercentage && "percentage",
                     )}
                   >
-                    {typeof item.value === "number"
-                      ? tooltipNumberFormatter(item.value)
-                      : item.value}
-                    {showPercentage ? "%" : ""}
+                    {/* A caller-supplied `valueFormatter` owns the value slot's
+                        text (indicator + label stay intact) and suppresses the
+                        `showPercentage` suffix. Falls back to the default numeric
+                        formatter, which keeps the "%" behavior. */}
+                    {valueFormatter ? (
+                      valueFormatter(item.value, String(item.dataKey ?? item.name ?? ""))
+                    ) : (
+                      <>
+                        {typeof item.value === "number"
+                          ? tooltipNumberFormatter(item.value)
+                          : item.value}
+                        {showPercentage ? "%" : ""}
+                      </>
+                    )}
                   </span>
                 )}
               </div>
@@ -188,6 +200,7 @@ function CustomTooltipContentRender(
     color,
     indicator,
     formatter,
+    valueFormatter,
     hideIndicator,
     nestLabel,
     tooltipLabel,

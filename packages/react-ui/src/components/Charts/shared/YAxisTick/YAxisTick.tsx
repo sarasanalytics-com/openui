@@ -27,12 +27,18 @@ interface YAxisTickProps {
 }
 
 const YAxisTick: React.FC<YAxisTickProps> = (props) => {
-  const { x, y, payload, textAnchor, verticalAnchor, className, setLabelWidth } = props;
+  const { x, y, payload, textAnchor, verticalAnchor, className, setLabelWidth, tickFormatter } =
+    props;
 
+  // A caller-supplied tickFormatter only receives numeric tick values, so a
+  // numeric formatter (e.g. `(v) => "$" + v.toFixed(2)`) is never handed a
+  // string. Non-numeric ticks fall back to the default formatting.
   const displayValue =
-    typeof payload?.value === "number"
-      ? numberTickFormatter(payload?.value)
-      : String(payload?.value);
+    tickFormatter && typeof payload?.value === "number"
+      ? tickFormatter(payload.value)
+      : typeof payload?.value === "number"
+        ? numberTickFormatter(payload?.value)
+        : String(payload?.value);
 
   useLayoutEffect(() => {
     setLabelWidth(displayValue);

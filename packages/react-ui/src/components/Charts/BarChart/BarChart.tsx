@@ -70,6 +70,10 @@ export interface BarChartProps<T extends BarChartData> {
   className?: string;
   height?: number;
   width?: number;
+  /** Formats Y-axis tick labels (e.g. `(v) => "$" + v.toFixed(2)`). */
+  yAxisTickFormatter?: (value: number) => string;
+  /** Formats tooltip values per-series, keyed on the series `dataKey`. */
+  tooltipValueFormatter?: (value: number | string, dataKey: string) => React.ReactNode;
 }
 
 const BAR_GAP = 10; // Gap between bars
@@ -96,6 +100,8 @@ const BarChartComponent = <T extends BarChartData>({
   className,
   height,
   width,
+  yAxisTickFormatter,
+  tooltipValueFormatter,
 }: BarChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -294,6 +300,10 @@ const BarChartComponent = <T extends BarChartData>({
             width={yAxisWidth}
             tickLine={false}
             axisLine={false}
+            // tickFormatter must live on YAxis itself: Recharts clones the tick
+            // element and injects the axis' own tickFormatter, clobbering one
+            // set directly on the child.
+            tickFormatter={yAxisTickFormatter}
             tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
           {/* Invisible bars to maintain scale synchronization */}
@@ -312,7 +322,17 @@ const BarChartComponent = <T extends BarChartData>({
         </RechartsBarChart>
       </div>
     );
-  }, [showYAxis, chartHeight, data, dataKeys, variant, id, maxLabelHeight, yAxisWidth]);
+  }, [
+    showYAxis,
+    chartHeight,
+    data,
+    dataKeys,
+    variant,
+    id,
+    maxLabelHeight,
+    yAxisWidth,
+    yAxisTickFormatter,
+  ]);
 
   // Handle mouse events for group hovering
   const handleChartMouseMove = useCallback((state: any) => {
@@ -509,7 +529,12 @@ const BarChartComponent = <T extends BarChartData>({
                       opacity: 1,
                       strokeWidth: 1,
                     }}
-                    content={<CustomTooltipContent parentRef={mainContainerRef} />}
+                    content={
+                      <CustomTooltipContent
+                        parentRef={mainContainerRef}
+                        valueFormatter={tooltipValueFormatter}
+                      />
+                    }
                     offset={15}
                   />
 
