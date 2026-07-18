@@ -1,0 +1,48 @@
+packages/react-ui/src/components/Charts/LineChart/stories/lineChartFormatters.stories.tsx
+  s_edc011c20ed9d2::t_1f178dd7c8a3b9 1-41
+packages/react-ui/src/components/Charts/shared/PortalTooltip/CustomTooltipContent.tsx
+  s_edc011c20ed9d2::t_6a71a19372b622 117-144,146-150,152-164,167-171
+packages/react-ui/src/components/Charts/AreaChart/stories/areaChartFormatters.stories.tsx
+  s_edc011c20ed9d2::t_2592345fb2676a 1-41
+packages/react-ui/src/components/Charts/shared/YAxisTick/YAxisTick.tsx
+  s_edc011c20ed9d2::t_ca82eb3040110c 30-31,33-35,37-41
+packages/react-ui/src/components/Charts/AreaChart/AreaChart.tsx
+  s_edc011c20ed9d2::t_7ad8b95652b0df 326-336
+  s_edc011c20ed9d2::t_8254204911942f 401-406
+  s_edc011c20ed9d2::t_845ae3d9a2f665 63-66
+  s_edc011c20ed9d2::t_e6df11d3cd5a37 307
+  s_edc011c20ed9d2::t_387f8f3403f85d 89-90,95-103
+  s_edc011c20ed9d2::t_2efcafbe4fe352 104
+packages/react-ui/src/components/Charts/BarChart/BarChart.tsx
+  s_edc011c20ed9d2::t_c01fc01b3dfb62 538-543
+  s_edc011c20ed9d2::t_04bffba6978f12 103-104,109-117
+  s_edc011c20ed9d2::t_0e7d36e5420666 331-341
+  s_edc011c20ed9d2::t_12a1b065fc89e9 73-76
+  s_edc011c20ed9d2::t_a41621a75b1f27 313
+  s_edc011c20ed9d2::t_b10e235f2045d9 118
+packages/react-ui/src/components/Charts/LineChart/LineChart.tsx
+  s_edc011c20ed9d2::t_dd36f7a63287b9 89-90,95-103
+  s_edc011c20ed9d2::t_aa57e04e1bcb52 308
+  s_edc011c20ed9d2::t_1fe99b25b82373 339
+  s_edc011c20ed9d2::t_1d3dfb5955d631 405-410
+  s_edc011c20ed9d2::t_c1ceb24b19c86e 62-65
+  s_edc011c20ed9d2::t_db76658a483531 104
+packages/react-ui/src/components/Charts/BarChart/stories/barChartFormatters.stories.tsx
+  s_edc011c20ed9d2::t_0f6e4205e4222f 1-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "97cd7a790a7f56cf865c51f0efc488c635d80d4e",
+  "prompts": {},
+  "sessions": {
+    "s_edc011c20ed9d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1ec51e76-78c3-4aef-8e6d-9b42cad235a2",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Venkateshwaran Selvaraj <venkateshwaran.s@sarasanalytics.com>"
+    }
+  }
+}
