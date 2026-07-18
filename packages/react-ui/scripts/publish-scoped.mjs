@@ -51,6 +51,12 @@ try {
   if (dryRun) {
     args.push("--dry-run");
   }
+  // Forward auth/extra flags (e.g. --otp=123456) to pnpm publish.
+  for (const arg of process.argv.slice(3)) {
+    if (arg.startsWith("--") && arg !== "--dry-run") {
+      args.push(arg);
+    }
+  }
   console.log(`Publishing ${SCOPED_NAME}@${version}${dryRun ? " (dry run)" : ""}...`);
   execFileSync("pnpm", args, { cwd: join(__dirname, ".."), stdio: "inherit" });
 } finally {
