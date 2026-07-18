@@ -294,7 +294,11 @@ const AreaChartComponent = <T extends AreaChartData>({
             width={yAxisWidth}
             tickLine={false}
             axisLine={false}
-            tick={<YAxisTick setLabelWidth={setLabelWidth} tickFormatter={yAxisTickFormatter} />}
+            // tickFormatter must live on YAxis itself: Recharts clones the tick
+            // element and injects the axis' own tickFormatter, clobbering one
+            // set directly on the child.
+            tickFormatter={yAxisTickFormatter}
+            tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
           {/* Invisible area to maintain scale synchronization */}
           {dataKeys.map((key) => {
