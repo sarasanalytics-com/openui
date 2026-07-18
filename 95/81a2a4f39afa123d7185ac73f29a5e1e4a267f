@@ -1,0 +1,19 @@
+packages/react-ui/scripts/publish-scoped.mjs
+  s_0d9208c1f663a0::t_14663d63026f80 54-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9581a2a4f39afa123d7185ac73f29a5e1e4a267f",
+  "prompts": {},
+  "sessions": {
+    "s_0d9208c1f663a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba38eceb-a120-442f-9398-ce1a0def53aa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Venkateshwaran Selvaraj <venkateshwaran.s@sarasanalytics.com>"
+    }
+  }
+}
