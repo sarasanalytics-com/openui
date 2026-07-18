@@ -60,6 +60,10 @@ export interface AreaChartProps<T extends AreaChartData> {
   className?: string;
   height?: number;
   width?: number;
+  /** Formats Y-axis tick labels (e.g. `(v) => "$" + v.toFixed(2)`). */
+  yAxisTickFormatter?: (value: number) => string;
+  /** Formats tooltip values per-series, keyed on the series `dataKey`. */
+  tooltipValueFormatter?: (value: number | string, dataKey: string) => React.ReactNode;
 }
 
 const X_AXIS_PADDING = 36;
@@ -82,9 +86,21 @@ const AreaChartComponent = <T extends AreaChartData>({
   className,
   height,
   width,
+  yAxisTickFormatter,
+  tooltipValueFormatter,
 }: AreaChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
+
+  // Wrap the per-series tooltip formatter into a Recharts `formatter`, keying on
+  // the item's dataKey so each series can format its own value.
+  const tooltipFormatter = useMemo(() => {
+    if (!tooltipValueFormatter) {
+      return undefined;
+    }
+    return (value: any, _name: any, item: any) =>
+      tooltipValueFormatter(value, String(item?.dataKey ?? item?.name ?? ""));
+  }, [tooltipValueFormatter]);
 
   const dataKeys = useMemo(() => {
     return getDataKeys(data, categoryKey as string);
@@ -288,7 +304,7 @@ const AreaChartComponent = <T extends AreaChartData>({
             width={yAxisWidth}
             tickLine={false}
             axisLine={false}
-            tick={<YAxisTick setLabelWidth={setLabelWidth} />}
+            tick={<YAxisTick setLabelWidth={setLabelWidth} tickFormatter={yAxisTickFormatter} />}
           />
           {/* Invisible area to maintain scale synchronization */}
           {dataKeys.map((key) => {
@@ -307,7 +323,17 @@ const AreaChartComponent = <T extends AreaChartData>({
         </RechartsAreaChart>
       </div>
     );
-  }, [showYAxis, chartHeight, data, dataKeys, variant, id, maxLabelHeight, yAxisWidth]);
+  }, [
+    showYAxis,
+    chartHeight,
+    data,
+    dataKeys,
+    variant,
+    id,
+    maxLabelHeight,
+    yAxisWidth,
+    yAxisTickFormatter,
+  ]);
 
   return (
     <LabelTooltipProvider>
@@ -372,7 +398,12 @@ const AreaChartComponent = <T extends AreaChartData>({
                   />
 
                   <ChartTooltip
-                    content={<CustomTooltipContent parentRef={mainContainerRef} />}
+                    content={
+                      <CustomTooltipContent
+                        parentRef={mainContainerRef}
+                        formatter={tooltipFormatter}
+                      />
+                    }
                     offset={15}
                   />
 

@@ -59,6 +59,10 @@ export interface LineChartProps<T extends LineChartData> {
   height?: number;
   width?: number;
   strokeWidth?: number;
+  /** Formats Y-axis tick labels (e.g. `(v) => "$" + v.toFixed(2)`). */
+  yAxisTickFormatter?: (value: number) => string;
+  /** Formats tooltip values per-series, keyed on the series `dataKey`. */
+  tooltipValueFormatter?: (value: number | string, dataKey: string) => React.ReactNode;
 }
 
 const X_AXIS_PADDING = 36;
@@ -82,9 +86,21 @@ export const LineChart = <T extends LineChartData>({
   height,
   width,
   strokeWidth = 2,
+  yAxisTickFormatter,
+  tooltipValueFormatter,
 }: LineChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
+
+  // Wrap the per-series tooltip formatter into a Recharts `formatter`, keying on
+  // the item's dataKey so each series can format its own value.
+  const tooltipFormatter = useMemo(() => {
+    if (!tooltipValueFormatter) {
+      return undefined;
+    }
+    return (value: any, _name: any, item: any) =>
+      tooltipValueFormatter(value, String(item?.dataKey ?? item?.name ?? ""));
+  }, [tooltipValueFormatter]);
 
   const dataKeys = useMemo(() => {
     return getDataKeys(data, categoryKey as string);
@@ -289,7 +305,7 @@ export const LineChart = <T extends LineChartData>({
             width={yAxisWidth}
             tickLine={false}
             axisLine={false}
-            tick={<YAxisTick setLabelWidth={setLabelWidth} />}
+            tick={<YAxisTick setLabelWidth={setLabelWidth} tickFormatter={yAxisTickFormatter} />}
           />
           {/* Invisible lines to maintain scale synchronization */}
           {dataKeys.map((key) => {
@@ -320,6 +336,7 @@ export const LineChart = <T extends LineChartData>({
     isAnimationActive,
     maxLabelHeight,
     yAxisWidth,
+    yAxisTickFormatter,
   ]);
 
   return (
@@ -385,7 +402,12 @@ export const LineChart = <T extends LineChartData>({
                   />
 
                   <ChartTooltip
-                    content={<CustomTooltipContent parentRef={mainContainerRef} />}
+                    content={
+                      <CustomTooltipContent
+                        parentRef={mainContainerRef}
+                        formatter={tooltipFormatter}
+                      />
+                    }
                     offset={15}
                   />
 

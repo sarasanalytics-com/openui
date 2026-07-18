@@ -114,60 +114,61 @@ function CustomTooltipContentRender(
               "openui-chart-tooltip-content-item--dot",
           )}
         >
-          {formatter && item?.value !== undefined && item.name ? (
-            formatter(item.value, item.name, item, index, item.payload)
-          ) : (
-            <>
-              {itemConfig?.icon ? (
-                <itemConfig.icon />
-              ) : (
-                !hideIndicator && (
-                  <div
-                    className={clsx(
-                      "openui-chart-tooltip-content-indicator",
-                      `openui-chart-tooltip-content-indicator--${indicator}`,
-                      isTwoItemsLayout && "openui-chart-tooltip-content-indicator--two-items",
-                    )}
-                    style={
-                      {
-                        "--color-bg": indicatorColor,
-                        "--color-border": indicatorColor,
-                      } as React.CSSProperties
-                    }
-                  />
-                )
+          <>
+            {itemConfig?.icon ? (
+              <itemConfig.icon />
+            ) : (
+              !hideIndicator && (
+                <div
+                  className={clsx(
+                    "openui-chart-tooltip-content-indicator",
+                    `openui-chart-tooltip-content-indicator--${indicator}`,
+                    isTwoItemsLayout && "openui-chart-tooltip-content-indicator--two-items",
+                  )}
+                  style={
+                    {
+                      "--color-bg": indicatorColor,
+                      "--color-border": indicatorColor,
+                    } as React.CSSProperties
+                  }
+                />
+              )
+            )}
+
+            <div
+              className={clsx(
+                "openui-chart-tooltip-content-value-wrapper",
+                isTwoItemsLayout && "openui-chart-tooltip-content-value-wrapper--vertical",
+                nestLabel
+                  ? "openui-chart-tooltip-content-value-wrapper--nested"
+                  : "openui-chart-tooltip-content-value-wrapper--standard",
               )}
+            >
+              <div className="openui-chart-tooltip-content-label">
+                {nestLabel && tooltipLabel}
+                <span>{itemConfig?.label || item.name}</span>
+              </div>
 
-              <div
-                className={clsx(
-                  "openui-chart-tooltip-content-value-wrapper",
-                  isTwoItemsLayout && "openui-chart-tooltip-content-value-wrapper--vertical",
-                  nestLabel
-                    ? "openui-chart-tooltip-content-value-wrapper--nested"
-                    : "openui-chart-tooltip-content-value-wrapper--standard",
-                )}
-              >
-                <div className="openui-chart-tooltip-content-label">
-                  {nestLabel && tooltipLabel}
-                  <span>{itemConfig?.label || item.name}</span>
-                </div>
-
-                {item.value !== undefined && (
-                  <span
-                    className={clsx(
-                      "openui-chart-tooltip-content-value",
-                      showPercentage && "percentage",
-                    )}
-                  >
-                    {typeof item.value === "number"
+              {item.value !== undefined && (
+                <span
+                  className={clsx(
+                    "openui-chart-tooltip-content-value",
+                    showPercentage && "percentage",
+                  )}
+                >
+                  {/* A caller-supplied `formatter` renders in the value slot,
+                      keeping the series indicator + label intact. Falls back to
+                      the default numeric formatter when unset. */}
+                  {formatter && item.name
+                    ? formatter(item.value, item.name, item, index, item.payload)
+                    : typeof item.value === "number"
                       ? tooltipNumberFormatter(item.value)
                       : item.value}
-                    {showPercentage ? "%" : ""}
-                  </span>
-                )}
-              </div>
-            </>
-          )}
+                  {showPercentage ? "%" : ""}
+                </span>
+              )}
+            </div>
+          </>
           <div className="openui-chart-tooltip-content-item-separator" />
         </div>
       );
