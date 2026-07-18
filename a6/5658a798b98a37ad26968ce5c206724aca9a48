@@ -1,0 +1,48 @@
+packages/react-ui/src/components/Charts/LineChart/LineChart.tsx
+  s_e1451ccd954b43::t_de86805fb6944e 83-89
+  s_e1451ccd954b43::t_e9bad914cf086b 145-146
+  s_e1451ccd954b43::t_e39974827e5302 191-193,195
+  s_e1451ccd954b43::t_5ba67ad986309a 531-539,543-547,558
+  s_e1451ccd954b43::t_f60d2ffcc0b57b 357-362,385,393-456
+  s_e1451ccd954b43::t_9a17489650c2bf 194
+  s_e1451ccd954b43::t_27354271e4bca6 565-566
+  s_e1451ccd954b43::t_2ebc59a129464a 110-111,120-144,149-151
+  s_e1451ccd954b43::t_18c504197a53a6 66-77
+  s_e1451ccd954b43::t_78462971da0816 457-458
+packages/react-ui/src/components/Charts/LineChart/stories/DualAxis.stories.tsx
+  s_e1451ccd954b43::t_4f66b7913520e5 1-133
+packages/react-ui/src/components/Charts/LineChart/lineChart.scss
+  s_e1451ccd954b43::t_d080e9c453ee53 12-17
+packages/react-ui/src/components/Charts/BarChart/barChart.scss
+  s_e1451ccd954b43::t_76bf6e3439e764 12-17
+packages/react-ui/src/components/Charts/BarChart/stories/DualAxis.stories.tsx
+  s_e1451ccd954b43::t_2d574d07e8766c 1-118
+packages/react-ui/src/components/Charts/BarChart/BarChart.tsx
+  s_e1451ccd954b43::t_ca93b5fd6268b2 77-88
+  s_e1451ccd954b43::t_ec844270ce7db4 577-578
+  s_e1451ccd954b43::t_5e28ecca529953 648-655
+  s_e1451ccd954b43::t_004c30162583d9 97-103
+  s_e1451ccd954b43::t_49d811b7b53098 138-167
+  s_e1451ccd954b43::t_8093849e70c666 678-679
+  s_e1451ccd954b43::t_a90804472cdaed 203-207
+  s_e1451ccd954b43::t_fc449a38389a55 362-367,386,394-452
+  s_e1451ccd954b43::t_2c6b50975ceb44 124-125
+  s_e1451ccd954b43::t_f44ba5c35c6565 522-525,533
+  s_e1451ccd954b43::t_97a9fdd7373656 453-454
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a65658a798b98a37ad26968ce5c206724aca9a48",
+  "prompts": {},
+  "sessions": {
+    "s_e1451ccd954b43": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ed83299-1e43-4a1b-b7b2-8960886227eb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Venkateshwaran Selvaraj <venkateshwaran.s@sarasanalytics.com>"
+    }
+  }
+}
