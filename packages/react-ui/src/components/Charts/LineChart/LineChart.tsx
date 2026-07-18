@@ -132,17 +132,16 @@ export const LineChart = <T extends LineChartData>({
   // left, otherwise the right axis would simply be the left axis relocated.
   const isDualAxis = secondaryKeys.length > 0 && secondaryKeys.length < dataKeys.length;
 
+  const secondaryKeySet = useMemo(() => new Set(secondaryKeys), [secondaryKeys]);
+
   // In single-axis mode this is `dataKeys` by identity, so every downstream
   // memo (axis width, chart config) keeps its existing behaviour untouched.
   const primaryKeys = useMemo(() => {
     if (!isDualAxis) {
       return dataKeys;
     }
-    const secondary = new Set(secondaryKeys);
-    return dataKeys.filter((key) => !secondary.has(key));
-  }, [isDualAxis, dataKeys, secondaryKeys]);
-
-  const secondaryKeySet = useMemo(() => new Set(secondaryKeys), [secondaryKeys]);
+    return dataKeys.filter((key) => !secondaryKeySet.has(key));
+  }, [isDualAxis, dataKeys, secondaryKeySet]);
 
   const variant = getLineType(lineChartVariant);
 
