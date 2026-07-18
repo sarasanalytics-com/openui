@@ -1,0 +1,43 @@
+packages/react-ui/src/components/Charts/AreaChart/stories/areaChart.stories.tsx
+  s_7a706a0f6bdefc::t_ea090b4a99a9ea 1365-1394
+packages/react-ui/scripts/publish-scoped.mjs
+  s_7a706a0f6bdefc::t_85f6a8e203c244 1-8,10-55
+  s_7a706a0f6bdefc::t_01bc0e03f1c8bc 9
+packages/react-ui/src/components/Charts/shared/YAxisTick/YAxisTick.tsx
+  s_7a706a0f6bdefc::t_e506b431d11c29 33-35,37
+packages/react-ui/src/components/Charts/BarChart/stories/barChart.stories.tsx
+  s_7a706a0f6bdefc::t_9b33878941995c 1433-1460
+packages/react-ui/src/components/Charts/BarChart/BarChart.tsx
+  s_7a706a0f6bdefc::t_c0a3d3de6254d0 531
+packages/react-ui/src/components/Charts/LineChart/stories/lineChart.stories.tsx
+  s_7a706a0f6bdefc::t_9b33878941995c 1293-1322
+packages/react-ui/src/components/Charts/AreaChart/AreaChart.tsx
+  s_7a706a0f6bdefc::t_c7a09725a4f4bd 394
+packages/react-ui/src/components/Charts/LineChart/LineChart.tsx
+  s_7a706a0f6bdefc::t_3e5a8849844b68 398
+packages/react-ui/package.json
+  s_7a706a0f6bdefc::t_c61e5a27ba4a77 93
+  s_7a706a0f6bdefc::t_28a648f8635f03 3,5
+  s_7a706a0f6bdefc::t_ccc8f9a1a64fde 97-98
+packages/react-ui/src/components/Charts/shared/PortalTooltip/CustomTooltipContent.tsx
+  s_7a706a0f6bdefc::t_6d87f5bb6ff4c9 21
+  s_7a706a0f6bdefc::t_56a0d38133589d 49
+  s_7a706a0f6bdefc::t_f0750b857df332 203
+  s_7a706a0f6bdefc::t_3e5afe0bed584e 119-140,143-182
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "87e7f2ea353d6ccb0b10c561b161128777135484",
+  "prompts": {},
+  "sessions": {
+    "s_7a706a0f6bdefc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e26b76e-530a-45fd-a18e-4512b68edf1b",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Venkateshwaran Selvaraj <venkateshwaran.s@sarasanalytics.com>"
+    }
+  }
+}
