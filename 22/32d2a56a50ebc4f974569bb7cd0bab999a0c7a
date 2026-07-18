@@ -1,0 +1,19 @@
+packages/react-ui/src/components/Charts/LineChart/LineChart.tsx
+  s_0798f3ee73bb51::t_f6850824567b1f 135-136,143-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "2232d2a56a50ebc4f974569bb7cd0bab999a0c7a",
+  "prompts": {},
+  "sessions": {
+    "s_0798f3ee73bb51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "34d4ad4d-3645-4e1a-9c49-52a6e0ec4b76",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Venkateshwaran Selvaraj <venkateshwaran.s@sarasanalytics.com>"
+    }
+  }
+}
