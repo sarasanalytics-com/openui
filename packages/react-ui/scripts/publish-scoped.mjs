@@ -43,12 +43,16 @@ for (const [dep, range] of Object.entries(PUBLISHED_PEER_DEPS)) {
 
 try {
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-  const args = ["publish"];
+  // pnpm, not npm: the manifest keeps `catalog:` ranges (react, zustand, …)
+  // that only pnpm resolves to real semver at pack time — npm would publish
+  // them verbatim and break every consumer. --no-git-checks because this
+  // script itself dirties package.json for the duration of the publish.
+  const args = ["publish", "--no-git-checks"];
   if (dryRun) {
     args.push("--dry-run");
   }
   console.log(`Publishing ${SCOPED_NAME}@${version}${dryRun ? " (dry run)" : ""}...`);
-  execFileSync("npm", args, { cwd: join(__dirname, ".."), stdio: "inherit" });
+  execFileSync("pnpm", args, { cwd: join(__dirname, ".."), stdio: "inherit" });
 } finally {
   writeFileSync(pkgPath, original);
   console.log("Restored original package.json");
