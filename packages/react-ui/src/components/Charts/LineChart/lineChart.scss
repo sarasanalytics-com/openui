@@ -9,6 +9,12 @@
   flex-shrink: 0;
 }
 
+// Secondary (right) Y-axis, dual-axis mode only. Sits after the scrollable
+// main container in the flex row and shares the left axis' sizing behaviour.
+.openui-line-chart-secondary-y-axis-container {
+  flex-shrink: 0;
+}
+
 .openui-line-chart-main-container {
   width: 100%;
   overflow-x: auto;

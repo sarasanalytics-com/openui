@@ -63,10 +63,29 @@ export interface LineChartProps<T extends LineChartData> {
   yAxisTickFormatter?: (value: number) => string;
   /** Formats tooltip values per-series, keyed on the series `dataKey`. */
   tooltipValueFormatter?: (value: number | string, dataKey: string) => React.ReactNode;
+  /**
+   * Data keys to plot against a secondary (right) Y-axis.
+   *
+   * Dual-axis mode activates only when this resolves to a non-empty *proper*
+   * subset of the chart's data keys — i.e. at least one key is left on the
+   * primary axis. Keys absent from the data are ignored; if the filter leaves
+   * nothing (or leaves nothing on the left), the chart renders single-axis
+   * exactly as it would without this prop.
+   */
+  secondaryDataKeys?: string[];
+  /** Formats secondary (right) Y-axis tick labels. Mirrors `yAxisTickFormatter`. */
+  secondaryYAxisTickFormatter?: (value: number) => string;
 }
 
 const X_AXIS_PADDING = 36;
 const CHART_CONTAINER_BOTTOM_MARGIN = 10;
+
+// Stable empty array so memos depending on "no secondary keys" don't re-run.
+const EMPTY_KEYS: string[] = [];
+
+// Recharts axis ids used only in dual-axis mode.
+const LEFT_AXIS_ID = "left";
+const RIGHT_AXIS_ID = "right";
 
 export const LineChart = <T extends LineChartData>({
   data,
@@ -88,6 +107,8 @@ export const LineChart = <T extends LineChartData>({
   strokeWidth = 2,
   yAxisTickFormatter,
   tooltipValueFormatter,
+  secondaryDataKeys,
+  secondaryYAxisTickFormatter,
 }: LineChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -96,9 +117,38 @@ export const LineChart = <T extends LineChartData>({
     return getDataKeys(data, categoryKey as string);
   }, [data, categoryKey]);
 
+  // Keys requested for the right axis, narrowed to those that actually exist in
+  // the data. Order follows `dataKeys` so series order stays stable.
+  const secondaryKeys = useMemo(() => {
+    if (!secondaryDataKeys?.length) {
+      return EMPTY_KEYS;
+    }
+    const requested = new Set(secondaryDataKeys);
+    const resolved = dataKeys.filter((key) => requested.has(key));
+    return resolved.length ? resolved : EMPTY_KEYS;
+  }, [secondaryDataKeys, dataKeys]);
+
+  // Dual-axis needs a *proper* subset: at least one series must remain on the
+  // left, otherwise the right axis would simply be the left axis relocated.
+  const isDualAxis = secondaryKeys.length > 0 && secondaryKeys.length < dataKeys.length;
+
+  // In single-axis mode this is `dataKeys` by identity, so every downstream
+  // memo (axis width, chart config) keeps its existing behaviour untouched.
+  const primaryKeys = useMemo(() => {
+    if (!isDualAxis) {
+      return dataKeys;
+    }
+    const secondary = new Set(secondaryKeys);
+    return dataKeys.filter((key) => !secondary.has(key));
+  }, [isDualAxis, dataKeys, secondaryKeys]);
+
+  const secondaryKeySet = useMemo(() => new Set(secondaryKeys), [secondaryKeys]);
+
   const variant = getLineType(lineChartVariant);
 
-  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, dataKeys);
+  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, primaryKeys);
+  const { yAxisWidth: secondaryYAxisWidth, setLabelWidth: setSecondaryLabelWidth } =
+    useYAxisLabelWidth(data, secondaryKeys);
 
   const widthOfGroup = useMemo(() => {
     return getWidthOfGroup(data);
@@ -138,8 +188,11 @@ export const LineChart = <T extends LineChartData>({
 
   const effectiveContainerWidth = useMemo(() => {
     const dynamicYAxisWidth = showYAxis ? yAxisWidth : 0;
-    return Math.max(0, effectiveWidth - dynamicYAxisWidth - 40); // -40 because we are giving 20px padding in xAxis on each side
-  }, [effectiveWidth, showYAxis, yAxisWidth]);
+    // In dual-axis mode the right axis is a second sibling chart, so it eats
+    // horizontal space too and must be subtracted as well.
+    const dynamicSecondaryYAxisWidth = showYAxis && isDualAxis ? secondaryYAxisWidth : 0;
+    return Math.max(0, effectiveWidth - dynamicYAxisWidth - dynamicSecondaryYAxisWidth - 40); // -40 because we are giving 20px padding in xAxis on each side
+  }, [effectiveWidth, showYAxis, yAxisWidth, isDualAxis, secondaryYAxisWidth]);
 
   const dataWidth = useMemo(() => {
     return getWidthOfData(data, effectiveContainerWidth);
@@ -301,8 +354,12 @@ export const LineChart = <T extends LineChartData>({
             tickFormatter={yAxisTickFormatter}
             tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
-          {/* Invisible lines to maintain scale synchronization */}
-          {dataKeys.map((key) => {
+          {/*
+            Invisible lines to maintain scale synchronization. Only the primary
+            series are rendered so this chart's auto-domain matches the main
+            chart's left axis, which Recharts derives from the same subset.
+          */}
+          {primaryKeys.map((key) => {
             return (
               <Line
                 key={`y-axis-${key}`}
@@ -325,12 +382,78 @@ export const LineChart = <T extends LineChartData>({
     chartHeight,
     data,
     onLineClick,
-    dataKeys,
+    primaryKeys,
     variant,
     isAnimationActive,
     maxLabelHeight,
     yAxisWidth,
     yAxisTickFormatter,
+  ]);
+
+  const secondaryYAxis = useMemo(() => {
+    if (!showYAxis || !isDualAxis) {
+      return null;
+    }
+    return (
+      <div className="openui-line-chart-y-axis-container openui-line-chart-secondary-y-axis-container">
+        {/* Right-axis only chart - mirrors the left axis chart */}
+        <RechartsLineChart
+          key={`secondary-y-axis-chart-${id}`}
+          width={secondaryYAxisWidth}
+          height={chartHeight}
+          data={data}
+          margin={{
+            top: 20,
+            bottom: maxLabelHeight + CHART_CONTAINER_BOTTOM_MARGIN, // this is required for to give space for x-axis
+            left: 0,
+            right: 0,
+          }}
+          onClick={onLineClick}
+        >
+          <YAxis
+            orientation="right"
+            width={secondaryYAxisWidth}
+            tickLine={false}
+            axisLine={false}
+            // tickFormatter must live on YAxis itself: Recharts clones the tick
+            // element and injects the axis' own tickFormatter, clobbering one
+            // set directly on the child.
+            tickFormatter={secondaryYAxisTickFormatter}
+            tick={<YAxisTick setLabelWidth={setSecondaryLabelWidth} />}
+          />
+          {/* Invisible lines to maintain scale synchronization with the main
+              chart's right axis, which sees only the secondary series. */}
+          {secondaryKeys.map((key) => {
+            return (
+              <Line
+                key={`secondary-y-axis-${key}`}
+                dataKey={key}
+                type={variant}
+                stroke="transparent"
+                strokeWidth={0}
+                dot={false}
+                activeDot={false}
+                isAnimationActive={isAnimationActive}
+              />
+            );
+          })}
+        </RechartsLineChart>
+      </div>
+    );
+  }, [
+    showYAxis,
+    isDualAxis,
+    id,
+    chartHeight,
+    data,
+    onLineClick,
+    secondaryKeys,
+    variant,
+    isAnimationActive,
+    maxLabelHeight,
+    secondaryYAxisWidth,
+    secondaryYAxisTickFormatter,
+    setSecondaryLabelWidth,
   ]);
 
   return (
@@ -405,9 +528,23 @@ export const LineChart = <T extends LineChartData>({
                     offset={15}
                   />
 
+                  {/*
+                    Hidden axes exist only so the series below can name a
+                    yAxisId — Recharts throws when a series references an axis
+                    that isn't declared. The visible ticks are drawn by the
+                    sibling axis charts.
+                  */}
+                  {isDualAxis && <YAxis yAxisId={LEFT_AXIS_ID} hide />}
+                  {isDualAxis && <YAxis yAxisId={RIGHT_AXIS_ID} orientation="right" hide />}
+
                   {dataKeys.map((key) => {
                     const transformedKey = transformedKeys[key];
                     const color = `var(--color-${transformedKey})`;
+                    const dualAxisProps = isDualAxis
+                      ? {
+                          yAxisId: secondaryKeySet.has(key) ? RIGHT_AXIS_ID : LEFT_AXIS_ID,
+                        }
+                      : {};
                     return (
                       <Line
                         key={`main-${key}`}
@@ -418,12 +555,15 @@ export const LineChart = <T extends LineChartData>({
                         dot={false}
                         activeDot={<ActiveDot key={`active-dot-${key}-${id}`} />}
                         isAnimationActive={isAnimationActive}
+                        {...dualAxisProps}
                       />
                     );
                   })}
                 </RechartsLineChart>
               </ChartContainer>
             </div>
+            {/* Secondary (right) Y-axis of the chart */}
+            {secondaryYAxis}
             {isSideBarTooltipOpen && <SideBarTooltip height={chartHeight} />}
           </div>
           {/* if the data width is greater than the effective width, then show the scroll buttons */}
