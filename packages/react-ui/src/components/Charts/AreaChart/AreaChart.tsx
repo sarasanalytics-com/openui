@@ -92,16 +92,6 @@ const AreaChartComponent = <T extends AreaChartData>({
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
 
-  // Wrap the per-series tooltip formatter into a Recharts `formatter`, keying on
-  // the item's dataKey so each series can format its own value.
-  const tooltipFormatter = useMemo(() => {
-    if (!tooltipValueFormatter) {
-      return undefined;
-    }
-    return (value: any, _name: any, item: any) =>
-      tooltipValueFormatter(value, String(item?.dataKey ?? item?.name ?? ""));
-  }, [tooltipValueFormatter]);
-
   const dataKeys = useMemo(() => {
     return getDataKeys(data, categoryKey as string);
   }, [data, categoryKey]);
@@ -401,7 +391,7 @@ const AreaChartComponent = <T extends AreaChartData>({
                     content={
                       <CustomTooltipContent
                         parentRef={mainContainerRef}
-                        formatter={tooltipFormatter}
+                        valueFormatter={tooltipValueFormatter}
                       />
                     }
                     offset={15}

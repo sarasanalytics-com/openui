@@ -30,11 +30,11 @@ const YAxisTick: React.FC<YAxisTickProps> = (props) => {
   const { x, y, payload, textAnchor, verticalAnchor, className, setLabelWidth, tickFormatter } =
     props;
 
-  // Honor a caller-supplied tickFormatter when present; otherwise fall back to
-  // the default numeric formatting. The guard on `value != null` avoids calling
-  // a numeric formatter (e.g. `(v) => "$" + v.toFixed(2)`) with undefined.
+  // A caller-supplied tickFormatter only receives numeric tick values, so a
+  // numeric formatter (e.g. `(v) => "$" + v.toFixed(2)`) is never handed a
+  // string. Non-numeric ticks fall back to the default formatting.
   const displayValue =
-    tickFormatter && payload?.value != null
+    tickFormatter && typeof payload?.value === "number"
       ? tickFormatter(payload.value)
       : typeof payload?.value === "number"
         ? numberTickFormatter(payload?.value)

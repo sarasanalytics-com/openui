@@ -18,6 +18,7 @@ type CustomTooltipContentProps = React.ComponentProps<typeof RechartsPrimitive.T
     showPercentage?: boolean;
     portalContainer?: React.RefObject<HTMLElement | null>;
     parentRef: React.RefObject<HTMLElement | null>;
+    valueFormatter?: (value: number | string, dataKey: string) => React.ReactNode;
   };
 
 /**
@@ -45,6 +46,7 @@ function CustomTooltipContentRender(
     showPercentage = false,
     portalContainer,
     parentRef,
+    valueFormatter,
   } = props;
 
   const { config, id } = useChart();
@@ -114,61 +116,70 @@ function CustomTooltipContentRender(
               "openui-chart-tooltip-content-item--dot",
           )}
         >
-          <>
-            {itemConfig?.icon ? (
-              <itemConfig.icon />
-            ) : (
-              !hideIndicator && (
-                <div
-                  className={clsx(
-                    "openui-chart-tooltip-content-indicator",
-                    `openui-chart-tooltip-content-indicator--${indicator}`,
-                    isTwoItemsLayout && "openui-chart-tooltip-content-indicator--two-items",
-                  )}
-                  style={
-                    {
-                      "--color-bg": indicatorColor,
-                      "--color-border": indicatorColor,
-                    } as React.CSSProperties
-                  }
-                />
-              )
-            )}
-
-            <div
-              className={clsx(
-                "openui-chart-tooltip-content-value-wrapper",
-                isTwoItemsLayout && "openui-chart-tooltip-content-value-wrapper--vertical",
-                nestLabel
-                  ? "openui-chart-tooltip-content-value-wrapper--nested"
-                  : "openui-chart-tooltip-content-value-wrapper--standard",
+          {formatter && item?.value !== undefined && item.name ? (
+            formatter(item.value, item.name, item, index, item.payload)
+          ) : (
+            <>
+              {itemConfig?.icon ? (
+                <itemConfig.icon />
+              ) : (
+                !hideIndicator && (
+                  <div
+                    className={clsx(
+                      "openui-chart-tooltip-content-indicator",
+                      `openui-chart-tooltip-content-indicator--${indicator}`,
+                      isTwoItemsLayout && "openui-chart-tooltip-content-indicator--two-items",
+                    )}
+                    style={
+                      {
+                        "--color-bg": indicatorColor,
+                        "--color-border": indicatorColor,
+                      } as React.CSSProperties
+                    }
+                  />
+                )
               )}
-            >
-              <div className="openui-chart-tooltip-content-label">
-                {nestLabel && tooltipLabel}
-                <span>{itemConfig?.label || item.name}</span>
+
+              <div
+                className={clsx(
+                  "openui-chart-tooltip-content-value-wrapper",
+                  isTwoItemsLayout && "openui-chart-tooltip-content-value-wrapper--vertical",
+                  nestLabel
+                    ? "openui-chart-tooltip-content-value-wrapper--nested"
+                    : "openui-chart-tooltip-content-value-wrapper--standard",
+                )}
+              >
+                <div className="openui-chart-tooltip-content-label">
+                  {nestLabel && tooltipLabel}
+                  <span>{itemConfig?.label || item.name}</span>
+                </div>
+
+                {item.value !== undefined && (
+                  <span
+                    className={clsx(
+                      "openui-chart-tooltip-content-value",
+                      showPercentage && "percentage",
+                    )}
+                  >
+                    {/* A caller-supplied `valueFormatter` owns the value slot's
+                        text (indicator + label stay intact) and suppresses the
+                        `showPercentage` suffix. Falls back to the default numeric
+                        formatter, which keeps the "%" behavior. */}
+                    {valueFormatter ? (
+                      valueFormatter(item.value, String(item.dataKey ?? item.name ?? ""))
+                    ) : (
+                      <>
+                        {typeof item.value === "number"
+                          ? tooltipNumberFormatter(item.value)
+                          : item.value}
+                        {showPercentage ? "%" : ""}
+                      </>
+                    )}
+                  </span>
+                )}
               </div>
-
-              {item.value !== undefined && (
-                <span
-                  className={clsx(
-                    "openui-chart-tooltip-content-value",
-                    showPercentage && "percentage",
-                  )}
-                >
-                  {/* A caller-supplied `formatter` renders in the value slot,
-                      keeping the series indicator + label intact. Falls back to
-                      the default numeric formatter when unset. */}
-                  {formatter && item.name
-                    ? formatter(item.value, item.name, item, index, item.payload)
-                    : typeof item.value === "number"
-                      ? tooltipNumberFormatter(item.value)
-                      : item.value}
-                  {showPercentage ? "%" : ""}
-                </span>
-              )}
-            </div>
-          </>
+            </>
+          )}
           <div className="openui-chart-tooltip-content-item-separator" />
         </div>
       );
@@ -189,6 +200,7 @@ function CustomTooltipContentRender(
     color,
     indicator,
     formatter,
+    valueFormatter,
     hideIndicator,
     nestLabel,
     tooltipLabel,

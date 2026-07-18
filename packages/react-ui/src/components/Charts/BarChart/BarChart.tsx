@@ -106,16 +106,6 @@ const BarChartComponent = <T extends BarChartData>({
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
 
-  // Wrap the per-series tooltip formatter into a Recharts `formatter`, keying on
-  // the item's dataKey so each series can format its own value.
-  const tooltipFormatter = useMemo(() => {
-    if (!tooltipValueFormatter) {
-      return undefined;
-    }
-    return (value: any, _name: any, item: any) =>
-      tooltipValueFormatter(value, String(item?.dataKey ?? item?.name ?? ""));
-  }, [tooltipValueFormatter]);
-
   const widthOfGroup = getWidthOfGroup(data, categoryKey as string, variant);
 
   const maxLabelHeight = useMaxLabelHeight(data, categoryKey as string, tickVariant, widthOfGroup);
@@ -538,7 +528,7 @@ const BarChartComponent = <T extends BarChartData>({
                     content={
                       <CustomTooltipContent
                         parentRef={mainContainerRef}
-                        formatter={tooltipFormatter}
+                        valueFormatter={tooltipValueFormatter}
                       />
                     }
                     offset={15}
