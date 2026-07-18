@@ -74,6 +74,18 @@ export interface BarChartProps<T extends BarChartData> {
   yAxisTickFormatter?: (value: number) => string;
   /** Formats tooltip values per-series, keyed on the series `dataKey`. */
   tooltipValueFormatter?: (value: number | string, dataKey: string) => React.ReactNode;
+  /**
+   * Data keys to plot against a secondary (right) Y-axis.
+   *
+   * Dual-axis mode activates only when this resolves to a non-empty *proper*
+   * subset of the chart's data keys — i.e. at least one key is left on the
+   * primary axis. Keys absent from the data are ignored. Ignored entirely when
+   * `variant` is `"stacked"`, where a split domain would make the stack
+   * meaningless.
+   */
+  secondaryDataKeys?: string[];
+  /** Formats secondary (right) Y-axis tick labels. Mirrors `yAxisTickFormatter`. */
+  secondaryYAxisTickFormatter?: (value: number) => string;
 }
 
 const BAR_GAP = 10; // Gap between bars
@@ -81,6 +93,13 @@ const BAR_CATEGORY_GAP = "20%"; // Gap between categories
 const BAR_INTERNAL_LINE_WIDTH = 1;
 const BAR_RADIUS = 4;
 const CHART_CONTAINER_BOTTOM_MARGIN = 10;
+
+// Stable empty array so memos depending on "no secondary keys" don't re-run.
+const EMPTY_KEYS: string[] = [];
+
+// Recharts axis ids used only in dual-axis mode.
+const LEFT_AXIS_ID = "left";
+const RIGHT_AXIS_ID = "right";
 
 const BarChartComponent = <T extends BarChartData>({
   data,
@@ -102,6 +121,8 @@ const BarChartComponent = <T extends BarChartData>({
   width,
   yAxisTickFormatter,
   tooltipValueFormatter,
+  secondaryDataKeys,
+  secondaryYAxisTickFormatter,
 }: BarChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -114,7 +135,36 @@ const BarChartComponent = <T extends BarChartData>({
     return getDataKeys(data, categoryKey as string);
   }, [data, categoryKey]);
 
-  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, dataKeys);
+  // Keys requested for the right axis, narrowed to those that actually exist in
+  // the data. Order follows `dataKeys` so series order stays stable. Stacked
+  // bars opt out: splitting a stack across two domains is incoherent.
+  const secondaryKeys = useMemo(() => {
+    if (!secondaryDataKeys?.length || variant === "stacked") {
+      return EMPTY_KEYS;
+    }
+    const requested = new Set(secondaryDataKeys);
+    const resolved = dataKeys.filter((key) => requested.has(key));
+    return resolved.length ? resolved : EMPTY_KEYS;
+  }, [secondaryDataKeys, dataKeys, variant]);
+
+  // Dual-axis needs a *proper* subset: at least one series must remain on the
+  // left, otherwise the right axis would simply be the left axis relocated.
+  const isDualAxis = secondaryKeys.length > 0 && secondaryKeys.length < dataKeys.length;
+
+  const secondaryKeySet = useMemo(() => new Set(secondaryKeys), [secondaryKeys]);
+
+  // In single-axis mode this is `dataKeys` by identity, so every downstream
+  // memo (axis width, chart config) keeps its existing behaviour untouched.
+  const primaryKeys = useMemo(() => {
+    if (!isDualAxis) {
+      return dataKeys;
+    }
+    return dataKeys.filter((key) => !secondaryKeySet.has(key));
+  }, [isDualAxis, dataKeys, secondaryKeySet]);
+
+  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, primaryKeys);
+  const { yAxisWidth: secondaryYAxisWidth, setLabelWidth: setSecondaryLabelWidth } =
+    useYAxisLabelWidth(data, secondaryKeys);
 
   const transformedKeys = useTransformedKeys(dataKeys);
 
@@ -150,8 +200,11 @@ const BarChartComponent = <T extends BarChartData>({
   // need this to calculate the padding for the chart container, because the y-axis is rendered in a separate chart
   const effectiveContainerWidth = useMemo(() => {
     const dynamicYAxisWidth = showYAxis ? yAxisWidth : 0;
-    return Math.max(0, effectiveWidth - dynamicYAxisWidth);
-  }, [effectiveWidth, showYAxis, yAxisWidth]);
+    // In dual-axis mode the right axis is a second sibling chart, so it eats
+    // horizontal space too and must be subtracted as well.
+    const dynamicSecondaryYAxisWidth = showYAxis && isDualAxis ? secondaryYAxisWidth : 0;
+    return Math.max(0, effectiveWidth - dynamicYAxisWidth - dynamicSecondaryYAxisWidth);
+  }, [effectiveWidth, showYAxis, yAxisWidth, isDualAxis, secondaryYAxisWidth]);
 
   const padding = useMemo(() => {
     return getPadding(data, categoryKey as string, effectiveContainerWidth, variant);
@@ -306,8 +359,12 @@ const BarChartComponent = <T extends BarChartData>({
             tickFormatter={yAxisTickFormatter}
             tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
-          {/* Invisible bars to maintain scale synchronization */}
-          {dataKeys.map((key) => {
+          {/*
+            Invisible bars to maintain scale synchronization. Only the primary
+            series are rendered so this chart's auto-domain matches the main
+            chart's left axis, which Recharts derives from the same subset.
+          */}
+          {primaryKeys.map((key) => {
             return (
               <Bar
                 key={`yaxis-bar-chart-${key}`}
@@ -326,12 +383,73 @@ const BarChartComponent = <T extends BarChartData>({
     showYAxis,
     chartHeight,
     data,
-    dataKeys,
+    primaryKeys,
     variant,
     id,
     maxLabelHeight,
     yAxisWidth,
     yAxisTickFormatter,
+  ]);
+
+  const secondaryYAxis = useMemo(() => {
+    if (!showYAxis || !isDualAxis) {
+      return null;
+    }
+    return (
+      <div className="openui-bar-chart-y-axis-container openui-bar-chart-secondary-y-axis-container">
+        {/* Right-axis only chart - mirrors the left axis chart */}
+        <RechartsBarChart
+          key={`secondary-y-axis-bar-chart-${id}`}
+          width={secondaryYAxisWidth}
+          height={chartHeight}
+          data={data}
+          stackOffset="sign"
+          margin={{
+            top: 20,
+            bottom: maxLabelHeight + CHART_CONTAINER_BOTTOM_MARGIN, // this is required for to give space for x-axis
+            left: 0,
+            right: 0,
+          }}
+        >
+          <YAxis
+            orientation="right"
+            width={secondaryYAxisWidth}
+            tickLine={false}
+            axisLine={false}
+            // tickFormatter must live on YAxis itself: Recharts clones the tick
+            // element and injects the axis' own tickFormatter, clobbering one
+            // set directly on the child.
+            tickFormatter={secondaryYAxisTickFormatter}
+            tick={<YAxisTick setLabelWidth={setSecondaryLabelWidth} />}
+          />
+          {/* Invisible bars to maintain scale synchronization with the main
+              chart's right axis, which sees only the secondary series.
+              Dual-axis mode never applies to stacked, so no stackId here. */}
+          {secondaryKeys.map((key) => {
+            return (
+              <Bar
+                key={`secondary-yaxis-bar-chart-${key}`}
+                dataKey={key}
+                fill="transparent"
+                isAnimationActive={false}
+                maxBarSize={0}
+              />
+            );
+          })}
+        </RechartsBarChart>
+      </div>
+    );
+  }, [
+    showYAxis,
+    isDualAxis,
+    chartHeight,
+    data,
+    secondaryKeys,
+    id,
+    maxLabelHeight,
+    secondaryYAxisWidth,
+    secondaryYAxisTickFormatter,
+    setSecondaryLabelWidth,
   ]);
 
   // Handle mouse events for group hovering
@@ -401,6 +519,10 @@ const BarChartComponent = <T extends BarChartData>({
       const transformedKey = transformedKeys[key];
       const color = `var(--color-${transformedKey})`;
 
+      const dualAxisProps = isDualAxis
+        ? { yAxisId: secondaryKeySet.has(key) ? RIGHT_AXIS_ID : LEFT_AXIS_ID }
+        : {};
+
       return (
         <Bar
           key={`main-${key}`}
@@ -408,6 +530,7 @@ const BarChartComponent = <T extends BarChartData>({
           fill={color}
           stackId={variant === "stacked" ? "a" : undefined}
           isAnimationActive={isAnimationActive}
+          {...dualAxisProps}
           maxBarSize={BAR_WIDTH}
           barSize={BAR_WIDTH}
           shape={(props: any) => {
@@ -451,6 +574,8 @@ const BarChartComponent = <T extends BarChartData>({
     barInternalLineColor,
     hoveredCategory,
     categoryKey,
+    isDualAxis,
+    secondaryKeySet,
   ]);
 
   return (
@@ -520,6 +645,14 @@ const BarChartComponent = <T extends BarChartData>({
                     padding={padding}
                   />
                   {/* Y-axis is rendered in the separate synchronized chart */}
+                  {/*
+                    Hidden axes exist only so the bars below can name a
+                    yAxisId — Recharts throws when a series references an axis
+                    that isn't declared. The visible ticks are drawn by the
+                    sibling axis charts.
+                  */}
+                  {isDualAxis && <YAxis yAxisId={LEFT_AXIS_ID} hide />}
+                  {isDualAxis && <YAxis yAxisId={RIGHT_AXIS_ID} orientation="right" hide />}
 
                   <ChartTooltip
                     // cursor={<SimpleCursor />}
@@ -542,6 +675,8 @@ const BarChartComponent = <T extends BarChartData>({
                 </RechartsBarChart>
               </ChartContainer>
             </div>
+            {/* Secondary (right) Y-axis of the chart */}
+            {secondaryYAxis}
             {isSideBarTooltipOpen && <SideBarTooltip height={chartHeight} />}
           </div>
           {/* if the data width is greater than the effective width, then show the scroll buttons */}
