@@ -1,0 +1,23 @@
+packages/react-ui/src/components/Charts/LineChart/LineChart.tsx
+  s_0d9208c1f663a0::t_e33310b9dbaf98 298-302
+packages/react-ui/src/components/Charts/AreaChart/AreaChart.tsx
+  s_0d9208c1f663a0::t_1eb46899272b72 297-301
+packages/react-ui/src/components/Charts/BarChart/BarChart.tsx
+  s_0d9208c1f663a0::t_9936ec67add012 303-307
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4160560ed583eba2f72b11a4e6ad59f06ad43af2",
+  "prompts": {},
+  "sessions": {
+    "s_0d9208c1f663a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba38eceb-a120-442f-9398-ce1a0def53aa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Venkateshwaran Selvaraj <venkateshwaran.s@sarasanalytics.com>"
+    }
+  }
+}
