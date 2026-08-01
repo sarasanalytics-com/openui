@@ -10,6 +10,7 @@ import { SideBarChartData, SideBarTooltipProvider } from "../context/SideBarTool
 import {
   useAutoAngleCalculation,
   useExportChartData,
+  useInteractiveLegend,
   useMaxLabelWidth,
   useTransformedKeys,
   useYAxisLabelWidth,
@@ -25,14 +26,8 @@ import {
   YAxisTick,
 } from "../shared";
 import { LabelTooltipProvider } from "../shared/LabelTooltip/LabelTooltip";
-import { LegendItem } from "../types";
 import { getBarStackInfo, getRadiusArray } from "../utils/BarCharts/BarChartsUtils";
-import {
-  get2dChartConfig,
-  getColorForDataKey,
-  getDataKeys,
-  getLegendItems,
-} from "../utils/dataUtils";
+import { get2dChartConfig, getColorForDataKey, getDataKeys } from "../utils/dataUtils";
 import { PaletteName, useChartPalette } from "../utils/PalletUtils";
 
 // this a technic to get the type of the onClick event of the bar chart
@@ -60,6 +55,11 @@ export interface BarChartCondensedProps<T extends BarChartData> {
   width?: number;
   /** Maximum bar width in pixels. Prevents bars from becoming too wide. Default: 12 */
   maxBarWidth?: number;
+  /**
+   * Legend click hides/shows a series and double click isolates it. Set to
+   * `false` for a plain, static legend.
+   */
+  interactiveLegend?: boolean;
 }
 
 // Default maximum bar width - prevents bars from becoming too wide with sparse data
@@ -92,6 +92,7 @@ const BarChartCondensedComponent = <T extends BarChartData>({
   height = CHART_HEIGHT,
   width,
   maxBarWidth = DEFAULT_MAX_BAR_WIDTH,
+  interactiveLegend = true,
 }: BarChartCondensedProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -100,7 +101,25 @@ const BarChartCondensedComponent = <T extends BarChartData>({
     return getDataKeys(data, categoryKey as string);
   }, [data, categoryKey]);
 
-  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, dataKeys);
+  // Palette length is driven by the FULL key list: colors are assigned
+  // positionally (middle-out), so hiding a series must never shrink this.
+  const colors = useChartPalette({
+    chartThemeName: theme,
+    customPalette,
+    themePaletteName: "barChartPalette",
+    dataLength: dataKeys.length,
+  });
+
+  const { visibleKeys, legendItems, legendInteractionProps } = useInteractiveLegend({
+    dataKeys,
+    colors,
+    icons,
+    enabled: interactiveLegend,
+  });
+
+  // Axis width and the shadow axis chart see only the rendered series, so the
+  // remaining series rescale when one is hidden.
+  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, visibleKeys);
 
   const maxLabelWidth = useMaxLabelWidth(data, categoryKey as string);
 
@@ -134,13 +153,6 @@ const BarChartCondensedComponent = <T extends BarChartData>({
   }, [height, xAxisHeight, tickVariant]);
 
   const transformedKeys = useTransformedKeys(dataKeys);
-
-  const colors = useChartPalette({
-    chartThemeName: theme,
-    customPalette,
-    themePaletteName: "barChartPalette",
-    dataLength: dataKeys.length,
-  });
 
   const chartConfig: ChartConfig = useMemo(() => {
     return get2dChartConfig(dataKeys, colors, transformedKeys, undefined, icons);
@@ -232,14 +244,21 @@ const BarChartCondensedComponent = <T extends BarChartData>({
     const spacePerCategory = availableWidth / data.length;
 
     // For grouped charts, multiple bars share the category space
-    const barsPerCategory = variant === "stacked" ? 1 : dataKeys.length;
+    const barsPerCategory = variant === "stacked" ? 1 : visibleKeys.length;
 
     // Simple division - let Recharts apply gaps via barGap and barCategoryGap props
     const barWidth = spacePerCategory / barsPerCategory;
 
     // Only apply maximum constraint, let Recharts handle thin bars automatically
     return Math.min(maxBarWidth, barWidth);
-  }, [explicitChartWidth, chartContainerWidth, data.length, dataKeys.length, variant, maxBarWidth]);
+  }, [
+    explicitChartWidth,
+    chartContainerWidth,
+    data.length,
+    visibleKeys.length,
+    variant,
+    maxBarWidth,
+  ]);
 
   // Handle mouse events for bar hovering
   const handleChartMouseMove = useCallback((state: any) => {
@@ -306,14 +325,6 @@ const BarChartCondensedComponent = <T extends BarChartData>({
     setIsLegendExpanded(false);
   }, [dataKeys]);
 
-  // Memoize legend items creation
-  const legendItems: LegendItem[] = useMemo(() => {
-    if (!legend) {
-      return [];
-    }
-    return getLegendItems(dataKeys, colors, icons);
-  }, [dataKeys, colors, icons, legend]);
-
   const yAxis = useMemo(() => {
     if (!showYAxis) {
       return null;
@@ -340,8 +351,9 @@ const BarChartCondensedComponent = <T extends BarChartData>({
             axisLine={false}
             tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
-          {/* Invisible bars to maintain scale synchronization */}
-          {dataKeys.map((key) => {
+          {/* Invisible bars to maintain scale synchronization. Only the visible
+              series are drawn so this chart's domain matches the main chart. */}
+          {visibleKeys.map((key) => {
             return (
               <Bar
                 key={`yaxis-bar-chart-condensed-${key}`}
@@ -360,7 +372,7 @@ const BarChartCondensedComponent = <T extends BarChartData>({
     showYAxis,
     effectiveHeight,
     data,
-    dataKeys,
+    visibleKeys,
     variant,
     id,
     yAxisWidth,
@@ -370,7 +382,7 @@ const BarChartCondensedComponent = <T extends BarChartData>({
   ]);
 
   const barElements = useMemo(() => {
-    return dataKeys.map((key) => {
+    return visibleKeys.map((key) => {
       const transformedKey = transformedKeys[key];
       const color = `var(--color-${transformedKey})`;
 
@@ -387,7 +399,9 @@ const BarChartCondensedComponent = <T extends BarChartData>({
             const { payload, value, dataKey } = props;
 
             const { isNegative, isFirstInStack, isLastInStack, hasNegativeValueInStack } =
-              getBarStackInfo(variant, value, dataKey, payload, dataKeys);
+              // Visible keys, so the rounded corners land on the top *rendered*
+              // bar rather than a hidden one.
+              getBarStackInfo(variant, value, dataKey, payload, visibleKeys);
 
             const customRadius = getRadiusArray(
               variant,
@@ -416,7 +430,7 @@ const BarChartCondensedComponent = <T extends BarChartData>({
       );
     });
   }, [
-    dataKeys,
+    visibleKeys,
     transformedKeys,
     variant,
     calculatedRadius,
@@ -520,6 +534,7 @@ const BarChartCondensedComponent = <T extends BarChartData>({
               containerWidth={effectiveWidth}
               isExpanded={isLegendExpanded}
               setIsExpanded={setIsLegendExpanded}
+              {...legendInteractionProps}
             />
           )}
         </div>

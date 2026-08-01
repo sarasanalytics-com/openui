@@ -15,3 +15,16 @@ if (typeof HTMLCanvasElement !== "undefined") {
     } as unknown as CanvasRenderingContext2D;
   } as unknown as HTMLCanvasElement["getContext"];
 }
+
+/**
+ * jsdom has no ResizeObserver, which both the chart components and Recharts'
+ * ResponsiveContainer construct on mount. The stub never fires — chart tests
+ * pass explicit `width`/`height` instead of relying on observed dimensions.
+ */
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}

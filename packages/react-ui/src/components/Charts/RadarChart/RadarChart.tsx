@@ -10,11 +10,10 @@ import {
 import { usePrintContext } from "../../../context/PrintContext";
 import { ChartConfig, ChartContainer, ChartTooltip } from "../Charts";
 import { SideBarTooltipProvider } from "../context/SideBarTooltipContext";
-import { useExportChartData, useTransformedKeys } from "../hooks";
+import { useExportChartData, useInteractiveLegend, useTransformedKeys } from "../hooks";
 import { ActiveDot, CustomTooltipContent, DefaultLegend } from "../shared";
-import { LegendItem } from "../types";
 import { useChartPalette } from "../utils/PalletUtils";
-import { get2dChartConfig, getDataKeys, getLegendItems } from "../utils/dataUtils";
+import { get2dChartConfig, getDataKeys } from "../utils/dataUtils";
 import { AxisLabel } from "./components/AxisLabel";
 import { RadarChartData } from "./types";
 
@@ -35,6 +34,11 @@ export interface RadarChartProps<T extends RadarChartData> {
   isAnimationActive?: boolean;
   height?: number;
   width?: number;
+  /**
+   * Legend click hides/shows a series and double click isolates it. Set to
+   * `false` for a plain, static legend.
+   */
+  interactiveLegend?: boolean;
 }
 
 const RadarChartComponent = <T extends RadarChartData>({
@@ -51,6 +55,7 @@ const RadarChartComponent = <T extends RadarChartData>({
   isAnimationActive = false,
   height,
   width,
+  interactiveLegend = true,
 }: RadarChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -61,6 +66,8 @@ const RadarChartComponent = <T extends RadarChartData>({
 
   const transformedKeys = useTransformedKeys(dataKeys);
 
+  // Palette length is driven by the FULL key list: colors are assigned
+  // positionally (middle-out), so hiding a series must never shrink this.
   const colors = useChartPalette({
     chartThemeName: theme,
     customPalette,
@@ -68,14 +75,17 @@ const RadarChartComponent = <T extends RadarChartData>({
     dataLength: dataKeys.length,
   });
 
+  const { visibleKeys, legendItems, legendInteractionProps } = useInteractiveLegend({
+    dataKeys,
+    colors,
+    icons,
+    enabled: interactiveLegend,
+  });
+
   // Create Config
   const chartConfig: ChartConfig = useMemo(() => {
     return get2dChartConfig(dataKeys, colors, transformedKeys, undefined, icons);
   }, [dataKeys, icons, colors, transformedKeys]);
-
-  const legendItems: LegendItem[] = useMemo(() => {
-    return getLegendItems(dataKeys, colors, icons);
-  }, [dataKeys, colors, icons]);
 
   const exportData = useExportChartData({
     type: "radar",
@@ -133,7 +143,7 @@ const RadarChartComponent = <T extends RadarChartData>({
   );
 
   const radars = useMemo(() => {
-    return dataKeys.map((key) => {
+    return visibleKeys.map((key) => {
       const transformedKey = transformedKeys[key];
       const color = `var(--color-${transformedKey})`;
       if (variant === "line") {
@@ -164,7 +174,7 @@ const RadarChartComponent = <T extends RadarChartData>({
         );
       }
     });
-  }, [dataKeys, transformedKeys, variant, strokeWidth, areaOpacity, isAnimationActive]);
+  }, [visibleKeys, transformedKeys, variant, strokeWidth, areaOpacity, isAnimationActive]);
 
   const wrapperClassName = useMemo(
     () =>
@@ -251,6 +261,7 @@ const RadarChartComponent = <T extends RadarChartData>({
             isExpanded={isLegendExpanded}
             setIsExpanded={setIsLegendExpanded}
             style={{ paddingTop: 0 }}
+            {...legendInteractionProps}
           />
         )}
       </div>
