@@ -3,7 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cell, PolarGrid, RadialBar, RadialBarChart, ResponsiveContainer } from "recharts";
 import { usePrintContext } from "../../../context/PrintContext";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../Charts";
-import { useCategoryVisibility, useExportChartData, useTransformedKeys } from "../hooks";
+import {
+  useCategoryVisibility,
+  useExportChartData,
+  useTransformedKeys,
+  type SeriesVisibilityChange,
+} from "../hooks";
 import { DefaultLegend } from "../shared/DefaultLegend/DefaultLegend";
 import { StackedLegend } from "../shared/StackedLegend/StackedLegend";
 import { LegendItem } from "../types/Legend";
@@ -45,6 +50,12 @@ export interface RadialChartProps<T extends RadialChartData> {
    * re-base on the visible categories. Set to `false` for a plain, static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which categories are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const STACKED_LEGEND_BREAKPOINT = 400;
@@ -73,6 +84,7 @@ export const RadialChart = <T extends RadialChartData>({
   height,
   width,
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: RadialChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -161,6 +173,7 @@ export const RadialChart = <T extends RadialChartData>({
   const { hiddenKeys, legendInteractionProps } = useCategoryVisibility({
     keys: categories,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   // Category -> color over the FULL list, so the survivors keep their color when

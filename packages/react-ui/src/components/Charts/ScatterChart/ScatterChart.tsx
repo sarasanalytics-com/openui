@@ -4,7 +4,12 @@ import { Cell, ScatterChart as RechartsScatterChart, Scatter, XAxis, YAxis } fro
 import { usePrintContext } from "../../../context/PrintContext";
 import { ChartConfig, ChartContainer, ChartTooltip } from "../Charts";
 import { SideBarChartData, SideBarTooltipProvider } from "../context/SideBarTooltipContext";
-import { useExportChartData, useInteractiveLegend, useYAxisLabelWidth } from "../hooks";
+import {
+  useExportChartData,
+  useInteractiveLegend,
+  useYAxisLabelWidth,
+  type SeriesVisibilityChange,
+} from "../hooks";
 import {
   CustomTooltipContent,
   DefaultLegend,
@@ -44,6 +49,12 @@ export interface ScatterChartProps {
    * `false` for a plain, static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which datasets are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const DEFAULT_CHART_HEIGHT = 296;
@@ -65,6 +76,7 @@ export const ScatterChart = ({
   width,
   shape = "circle",
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: ScatterChartProps) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -87,6 +99,7 @@ export const ScatterChart = ({
     dataKeys: datasets,
     colors,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   // Points are transformed over the FULL dataset list so every dataset keeps

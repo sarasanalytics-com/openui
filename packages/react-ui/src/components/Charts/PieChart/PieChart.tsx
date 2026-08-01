@@ -4,7 +4,12 @@ import { Cell, Pie, PieChart as RechartsPieChart } from "recharts";
 import { usePrintContext } from "../../../context/PrintContext.js";
 import { useTheme } from "../../ThemeProvider/ThemeProvider.js";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../Charts.js";
-import { useCategoryVisibility, useExportChartData, useTransformedKeys } from "../hooks/index.js";
+import {
+  useCategoryVisibility,
+  useExportChartData,
+  useTransformedKeys,
+  type SeriesVisibilityChange,
+} from "../hooks/index.js";
 import { DefaultLegend } from "../shared/DefaultLegend/DefaultLegend.js";
 import { StackedLegend } from "../shared/StackedLegend/StackedLegend.js";
 import { LegendItem } from "../types/Legend.js";
@@ -50,6 +55,12 @@ export interface PieChartProps<T extends PieChartData> {
    * static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which slices are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const STACKED_LEGEND_BREAKPOINT = 400;
@@ -80,6 +91,7 @@ const PieChartComponent = <T extends PieChartData>({
   height,
   width,
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: PieChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -167,6 +179,7 @@ const PieChartComponent = <T extends PieChartData>({
   const { hiddenKeys, legendInteractionProps } = useCategoryVisibility({
     keys: categories,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   // Category -> color over the FULL list, so the survivors keep their color when

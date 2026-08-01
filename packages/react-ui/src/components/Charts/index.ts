@@ -13,3 +13,6 @@ export * from "./RadarChart";
 export * from "./RadialChart";
 export * from "./ScatterChart";
 export * from "./SingleStackedBarChart";
+
+/** Payload of every chart's `onSeriesVisibilityChange`. */
+export type { SeriesVisibilityChange } from "./hooks/useSeriesVisibility";

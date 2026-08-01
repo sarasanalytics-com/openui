@@ -11,6 +11,7 @@ import {
   useMaxLabelHeight,
   useTransformedKeys,
   useYAxisLabelWidth,
+  type SeriesVisibilityChange,
 } from "../hooks";
 import {
   cartesianGrid,
@@ -86,6 +87,12 @@ export interface BarChartProps<T extends BarChartData> {
    * `false` for a plain, static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const BAR_GAP = 10; // Gap between bars
@@ -124,6 +131,7 @@ const BarChartComponent = <T extends BarChartData>({
   secondaryDataKeys,
   secondaryYAxisTickFormatter,
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: BarChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -179,6 +187,7 @@ const BarChartComponent = <T extends BarChartData>({
     colors,
     icons,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   const visibleKeySet = useMemo(() => new Set(visibleKeys), [visibleKeys]);

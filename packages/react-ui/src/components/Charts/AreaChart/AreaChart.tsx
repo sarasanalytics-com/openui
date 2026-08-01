@@ -10,6 +10,7 @@ import {
   useMaxLabelHeight,
   useTransformedKeys,
   useYAxisLabelWidth,
+  type SeriesVisibilityChange,
 } from "../hooks";
 import {
   ActiveDot,
@@ -65,6 +66,12 @@ export interface AreaChartProps<T extends AreaChartData> {
    * `false` for a plain, static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const X_AXIS_PADDING = 36;
@@ -90,6 +97,7 @@ const AreaChartComponent = <T extends AreaChartData>({
   yAxisTickFormatter,
   tooltipValueFormatter,
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: AreaChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -114,6 +122,7 @@ const AreaChartComponent = <T extends AreaChartData>({
     colors,
     icons,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   // The axis width and the shadow axis chart below see only the rendered

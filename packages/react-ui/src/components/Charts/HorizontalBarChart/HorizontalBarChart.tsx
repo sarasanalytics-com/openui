@@ -5,7 +5,12 @@ import { usePrintContext } from "../../../context/PrintContext";
 import { useTheme } from "../../ThemeProvider";
 import { ChartConfig, ChartContainer, ChartTooltip } from "../Charts";
 import { SideBarChartData, SideBarTooltipProvider } from "../context/SideBarTooltipContext";
-import { useExportChartData, useInteractiveLegend, useTransformedKeys } from "../hooks";
+import {
+  useExportChartData,
+  useInteractiveLegend,
+  useTransformedKeys,
+  type SeriesVisibilityChange,
+} from "../hooks";
 import { useHorizontalBarLabelHeight } from "../hooks/useMaxLabelHeight";
 import {
   CustomTooltipContent,
@@ -64,6 +69,12 @@ export interface HorizontalBarChartProps<T extends HorizontalBarChartData> {
    * `false` for a plain, static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const X_AXIS_HEIGHT = 40; // Height of X-axis chart when shown
@@ -89,6 +100,7 @@ const HorizontalBarChartComponent = <T extends HorizontalBarChartData>({
   height,
   width,
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: HorizontalBarChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -137,6 +149,7 @@ const HorizontalBarChartComponent = <T extends HorizontalBarChartData>({
     colors,
     icons,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   const chartConfig: ChartConfig = useMemo(() => {

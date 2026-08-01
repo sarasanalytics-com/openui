@@ -10,7 +10,12 @@ import {
 import { usePrintContext } from "../../../context/PrintContext";
 import { ChartConfig, ChartContainer, ChartTooltip } from "../Charts";
 import { SideBarTooltipProvider } from "../context/SideBarTooltipContext";
-import { useExportChartData, useInteractiveLegend, useTransformedKeys } from "../hooks";
+import {
+  useExportChartData,
+  useInteractiveLegend,
+  useTransformedKeys,
+  type SeriesVisibilityChange,
+} from "../hooks";
 import { ActiveDot, CustomTooltipContent, DefaultLegend } from "../shared";
 import { useChartPalette } from "../utils/PalletUtils";
 import { get2dChartConfig, getDataKeys } from "../utils/dataUtils";
@@ -39,6 +44,12 @@ export interface RadarChartProps<T extends RadarChartData> {
    * `false` for a plain, static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const RadarChartComponent = <T extends RadarChartData>({
@@ -56,6 +67,7 @@ const RadarChartComponent = <T extends RadarChartData>({
   height,
   width,
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: RadarChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -80,6 +92,7 @@ const RadarChartComponent = <T extends RadarChartData>({
     colors,
     icons,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   // Create Config

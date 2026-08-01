@@ -14,6 +14,7 @@ import {
   useMaxLabelWidth,
   useTransformedKeys,
   useYAxisLabelWidth,
+  type SeriesVisibilityChange,
 } from "../hooks";
 import {
   cartesianGrid,
@@ -60,6 +61,12 @@ export interface BarChartCondensedProps<T extends BarChartData> {
    * `false` for a plain, static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 // Default maximum bar width - prevents bars from becoming too wide with sparse data
@@ -93,6 +100,7 @@ const BarChartCondensedComponent = <T extends BarChartData>({
   width,
   maxBarWidth = DEFAULT_MAX_BAR_WIDTH,
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: BarChartCondensedProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -115,6 +123,7 @@ const BarChartCondensedComponent = <T extends BarChartData>({
     colors,
     icons,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   // Axis width and the shadow axis chart see only the rendered series, so the

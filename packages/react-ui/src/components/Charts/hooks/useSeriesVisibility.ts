@@ -1,5 +1,25 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
+/**
+ * A single legend interaction that actually changed which series are visible.
+ *
+ * Guarded no-ops never produce one: a blocked hide of the last visible series,
+ * a key that is not part of the chart, or a `showAll` while nothing is hidden
+ * stay silent.
+ *
+ * A browser double click fires `click`, `click`, `dblclick`, so isolating a
+ * series legitimately emits `hide`, `show`, `isolate` in that order. Consumers
+ * that only care about the end state (analytics, for instance) should debounce.
+ */
+export type SeriesVisibilityChange = {
+  /** Key the user acted on. Empty for `showAll`, which targets no single key. */
+  key: string;
+  /** What the interaction did, after guards. */
+  action: "hide" | "show" | "isolate" | "restore";
+  /** Keys visible AFTER the change, in original order. */
+  visibleKeys: string[];
+};
+
 export interface UseSeriesVisibilityResult {
   /** Keys of the series that are currently hidden. */
   hiddenKeys: Set<string>;
@@ -23,9 +43,17 @@ export interface UseSeriesVisibilityResult {
  * not by array identity, so ordinary re-renders keep the user's selection).
  *
  * All returned callbacks are stable across re-renders so memoized consumers such
- * as `DefaultLegend` do not re-render needlessly.
+ * as `DefaultLegend` do not re-render needlessly. `onChange` is read through a
+ * ref, so passing a fresh arrow function on every render costs nothing.
+ *
+ * @param dataKeys Every series of the chart, in its original order.
+ * @param onChange Notified after a change is applied. See
+ *   {@link SeriesVisibilityChange} for what is and is not reported.
  */
-export const useSeriesVisibility = (dataKeys: string[]): UseSeriesVisibilityResult => {
+export const useSeriesVisibility = (
+  dataKeys: string[],
+  onChange?: (change: SeriesVisibilityChange) => void,
+): UseSeriesVisibilityResult => {
   const keysSignature = dataKeys.join("\u0000");
 
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => new Set<string>());
@@ -45,46 +73,82 @@ export const useSeriesVisibility = (dataKeys: string[]): UseSeriesVisibilityResu
   dataKeysRef.current = dataKeys;
   const hiddenKeysRef = useRef(hiddenKeys);
   hiddenKeysRef.current = hiddenKeys;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
-  const toggle = useCallback((key: string) => {
-    setHiddenKeys((prev) => {
+  /**
+   * Commits a new hidden set and reports it.
+   *
+   * The ref is updated up front so several interactions inside one tick still
+   * read the latest state, and so the notification can be fired here — outside
+   * the state updater, which must stay pure.
+   */
+  const applyChange = useCallback(
+    (key: string, action: SeriesVisibilityChange["action"], next: Set<string>) => {
+      hiddenKeysRef.current = next;
+      setHiddenKeys(next);
+
+      const listener = onChangeRef.current;
+      if (!listener) return;
+      listener({
+        key,
+        action,
+        visibleKeys: dataKeysRef.current.filter((k) => !next.has(k)),
+      });
+    },
+    [],
+  );
+
+  const toggle = useCallback(
+    (key: string) => {
       const keys = dataKeysRef.current;
-      if (!keys.includes(key)) return prev;
+      if (!keys.includes(key)) return;
+
+      const prev = hiddenKeysRef.current;
 
       if (prev.has(key)) {
         const next = new Set(prev);
         next.delete(key);
-        return next;
+        applyChange(key, "show", next);
+        return;
       }
 
       // Keep at least one series visible.
       const visibleCount = keys.filter((k) => !prev.has(k)).length;
-      if (visibleCount <= 1) return prev;
+      if (visibleCount <= 1) return;
 
       const next = new Set(prev);
       next.add(key);
-      return next;
-    });
-  }, []);
+      applyChange(key, "hide", next);
+    },
+    [applyChange],
+  );
 
-  const isolate = useCallback((key: string) => {
-    setHiddenKeys((prev) => {
+  const isolate = useCallback(
+    (key: string) => {
       const keys = dataKeysRef.current;
-      if (!keys.includes(key)) return prev;
+      if (!keys.includes(key)) return;
 
+      const prev = hiddenKeysRef.current;
       const visible = keys.filter((k) => !prev.has(k));
+
       // Already isolated -> restore everything.
       if (visible.length === 1 && visible[0] === key) {
-        return prev.size === 0 ? prev : new Set<string>();
+        if (prev.size === 0) return;
+        applyChange(key, "restore", new Set<string>());
+        return;
       }
 
-      return new Set(keys.filter((k) => k !== key));
-    });
-  }, []);
+      applyChange(key, "isolate", new Set(keys.filter((k) => k !== key)));
+    },
+    [applyChange],
+  );
 
   const showAll = useCallback(() => {
-    setHiddenKeys((prev) => (prev.size === 0 ? prev : new Set<string>()));
-  }, []);
+    if (hiddenKeysRef.current.size === 0) return;
+    // Not scoped to a single series, hence the empty key.
+    applyChange("", "restore", new Set<string>());
+  }, [applyChange]);
 
   const isHidden = useCallback((key: string) => hiddenKeysRef.current.has(key), []);
 

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useSeriesVisibility } from "./useSeriesVisibility";
+import { useSeriesVisibility, type SeriesVisibilityChange } from "./useSeriesVisibility";
 
 /** Shared, referentially stable "nothing is hidden" set. */
 const EMPTY_HIDDEN_KEYS: ReadonlySet<string> = new Set<string>();
@@ -17,6 +17,8 @@ export interface UseCategoryVisibilityArgs {
   keys: string[];
   /** When false the legend stays static and every category stays visible. */
   enabled?: boolean;
+  /** Notified after a legend interaction changed which categories are visible. */
+  onVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 export interface UseCategoryVisibilityResult {
@@ -49,8 +51,12 @@ export interface UseCategoryVisibilityResult {
 export const useCategoryVisibility = ({
   keys,
   enabled = true,
+  onVisibilityChange,
 }: UseCategoryVisibilityArgs): UseCategoryVisibilityResult => {
-  const { hiddenKeys, visibleKeys, toggle, isolate } = useSeriesVisibility(keys);
+  const { hiddenKeys, visibleKeys, toggle, isolate } = useSeriesVisibility(
+    keys,
+    onVisibilityChange,
+  );
 
   const legendInteractionProps: CategoryLegendInteractionProps = useMemo(() => {
     if (!enabled) {

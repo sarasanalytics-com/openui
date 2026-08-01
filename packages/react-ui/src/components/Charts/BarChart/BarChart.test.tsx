@@ -1,5 +1,5 @@
 import { fireEvent, render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   countSeries,
   doubleClickLegendItem,
@@ -122,6 +122,20 @@ describe("BarChart interactive legend", () => {
     fireEvent.click(getLegendItem("revenue"));
     expect(countSeries(container, "bar")).toBe(1);
     expect(getLegendItem("conversionRate").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("reports a legend click through onSeriesVisibilityChange", () => {
+    const onSeriesVisibilityChange = vi.fn();
+    renderChart({ onSeriesVisibilityChange });
+
+    fireEvent.click(getLegendItem("revenue"));
+
+    expect(onSeriesVisibilityChange).toHaveBeenCalledTimes(1);
+    expect(onSeriesVisibilityChange).toHaveBeenCalledWith({
+      key: "revenue",
+      action: "hide",
+      visibleKeys: ["sales", "costs", "margin"],
+    });
   });
 
   it("keeps the legend static when interactiveLegend is false", () => {

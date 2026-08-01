@@ -12,6 +12,7 @@ import {
   useMaxLabelWidth,
   useTransformedKeys,
   useYAxisLabelWidth,
+  type SeriesVisibilityChange,
 } from "../hooks";
 import { LineChartData, LineChartVariant } from "../LineChart/types";
 import {
@@ -57,6 +58,12 @@ export interface LineChartCondensedProps<T extends LineChartData> {
    * `false` for a plain, static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const CHART_HEIGHT = 296;
@@ -81,6 +88,7 @@ const LineChartCondensedComponent = <T extends LineChartData>({
   width,
   strokeWidth = 2,
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: LineChartCondensedProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -105,6 +113,7 @@ const LineChartCondensedComponent = <T extends LineChartData>({
     colors,
     icons,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   // Axis width and the shadow axis chart see only the rendered series, so the

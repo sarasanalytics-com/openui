@@ -10,6 +10,7 @@ import {
   useMaxLabelHeight,
   useTransformedKeys,
   useYAxisLabelWidth,
+  type SeriesVisibilityChange,
 } from "../hooks";
 import {
   ActiveDot,
@@ -76,6 +77,12 @@ export interface LineChartProps<T extends LineChartData> {
    * `false` for a plain, static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const X_AXIS_PADDING = 36;
@@ -111,6 +118,7 @@ export const LineChart = <T extends LineChartData>({
   secondaryDataKeys,
   secondaryYAxisTickFormatter,
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: LineChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -161,6 +169,7 @@ export const LineChart = <T extends LineChartData>({
     colors,
     icons,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   const visibleKeySet = useMemo(() => new Set(visibleKeys), [visibleKeys]);

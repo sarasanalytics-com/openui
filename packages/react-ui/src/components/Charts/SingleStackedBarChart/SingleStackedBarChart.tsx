@@ -2,7 +2,7 @@ import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrintContext } from "../../../context/PrintContext";
 import { Separator } from "../../Separator";
-import { useCategoryVisibility, useExportChartData } from "../hooks";
+import { useCategoryVisibility, useExportChartData, type SeriesVisibilityChange } from "../hooks";
 import { DefaultLegend } from "../shared/DefaultLegend/DefaultLegend";
 import { FloatingUIPortal } from "../shared/PortalTooltip";
 import { StackedLegend } from "../shared/StackedLegend/StackedLegend";
@@ -28,6 +28,12 @@ export interface SingleStackedBarProps<T extends SingleStackedBarData> {
    * plain, static legend.
    */
   interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which segments are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 export const SingleStackedBar = <T extends SingleStackedBarData>({
@@ -42,6 +48,7 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
   style,
   animated = true,
   interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: SingleStackedBarProps<T>) => {
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -84,6 +91,7 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
   const { hiddenKeys, legendInteractionProps } = useCategoryVisibility({
     keys: segmentKeys,
     enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   // Get theme colors for each segment

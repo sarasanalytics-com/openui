@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { type LegendItem } from "../types";
 import { getLegendItems } from "../utils/dataUtils";
-import { useSeriesVisibility } from "./useSeriesVisibility";
+import { useSeriesVisibility, type SeriesVisibilityChange } from "./useSeriesVisibility";
 
 /** Shared, referentially stable "nothing is hidden" set. */
 const EMPTY_HIDDEN_KEYS: ReadonlySet<string> = new Set<string>();
@@ -23,6 +23,8 @@ export interface UseInteractiveLegendArgs {
   icons?: Partial<Record<string, React.ComponentType>>;
   /** When false the legend stays static and every series stays visible. */
   enabled?: boolean;
+  /** Notified after a legend interaction changed which series are visible. */
+  onVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 export interface UseInteractiveLegendResult {
@@ -60,8 +62,12 @@ export const useInteractiveLegend = ({
   colors,
   icons,
   enabled = true,
+  onVisibilityChange,
 }: UseInteractiveLegendArgs): UseInteractiveLegendResult => {
-  const { hiddenKeys, visibleKeys, toggle, isolate } = useSeriesVisibility(dataKeys);
+  const { hiddenKeys, visibleKeys, toggle, isolate } = useSeriesVisibility(
+    dataKeys,
+    onVisibilityChange,
+  );
 
   const effectiveHiddenKeys = enabled ? hiddenKeys : EMPTY_HIDDEN_KEYS;
   const effectiveVisibleKeys = enabled ? visibleKeys : dataKeys;
