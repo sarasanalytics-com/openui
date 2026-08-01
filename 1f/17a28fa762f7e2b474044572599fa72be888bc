@@ -1,0 +1,82 @@
+packages/react-ui/src/components/Charts/hooks/index.ts
+  s_ad30c3b24dbe92::t_10ee8bb02d7e76 3
+packages/react-ui/src/components/Charts/SingleStackedBarChart/SingleStackedBarChart.test.tsx
+  s_ad30c3b24dbe92::t_09b342bde33f16 1-145
+packages/react-ui/src/components/Charts/RadialChart/RadialChart.tsx
+  s_ad30c3b24dbe92::t_b523127bf71c9f 6
+  s_ad30c3b24dbe92::t_b9005ab2c1ef92 75
+  s_ad30c3b24dbe92::t_7f24727d2ec3a1 325,336,349
+  s_ad30c3b24dbe92::t_e74231da675f3c 222-223,226-236,240
+  s_ad30c3b24dbe92::t_cc88b06fbf2365 43-47
+  s_ad30c3b24dbe92::t_6c68f5e64006aa 151-153,161-189
+  s_ad30c3b24dbe92::t_34b437412bc99c 432-434
+  s_ad30c3b24dbe92::t_81fbff6e4e10fa 200-201,203-204
+  s_ad30c3b24dbe92::t_5b4cfe873ae600 190
+packages/react-ui/src/components/Charts/SingleStackedBarChart/SingleStackedBarChart.tsx
+  s_ad30c3b24dbe92::t_7d0a71acfbf080 25-30
+  s_ad30c3b24dbe92::t_e27a3e5bc7e1e2 272
+  s_ad30c3b24dbe92::t_4dffc493f70dda 214-215,225,230
+  s_ad30c3b24dbe92::t_22580fe98ec7e2 44
+  s_ad30c3b24dbe92::t_51d48834d1dbde 180
+  s_ad30c3b24dbe92::t_4f7f3e4a0171ed 170-173,176-178
+  s_ad30c3b24dbe92::t_e0be5e053a09f1 67-68,78,82-88,97-126,129-130,132,134,136,141-142,145-146,148
+  s_ad30c3b24dbe92::t_a6d9e516cc6b30 258
+  s_ad30c3b24dbe92::t_c51de6c9253bcb 286
+  s_ad30c3b24dbe92::t_7d8a9a3d5e3e0f 181-197,200
+  s_ad30c3b24dbe92::t_d4be8cd9bab2d2 5
+  s_ad30c3b24dbe92::t_3aef0cfd005a78 179
+packages/react-ui/src/components/Charts/shared/StackedLegend/StackedLegend.tsx
+  s_ad30c3b24dbe92::t_aee042cfc51e89 144-147,149
+  s_ad30c3b24dbe92::t_3fb948d3f274c4 78-81
+  s_ad30c3b24dbe92::t_03af968523bcb4 59-60
+  s_ad30c3b24dbe92::t_4000305c24fe67 197-243,246-251
+  s_ad30c3b24dbe92::t_05ad7a220850de 23-33,37,41
+  s_ad30c3b24dbe92::t_d43142014fbd71 42
+packages/react-ui/src/components/Charts/hooks/useCategoryVisibility.ts
+  s_ad30c3b24dbe92::t_1e8eca96a1b42e 1-67
+packages/react-ui/src/components/Charts/PieChart/stories/InteractiveLegend.stories.tsx
+  s_ad30c3b24dbe92::t_6a87a9ff290e35 1-81
+packages/react-ui/src/components/Charts/SingleStackedBarChart/stories/InteractiveLegend.stories.tsx
+  s_ad30c3b24dbe92::t_d00460ffcd1bc1 1-67
+packages/react-ui/src/components/Charts/PieChart/PieChart.tsx
+  s_ad30c3b24dbe92::t_bc9ae6ee95414b 47-52
+  s_ad30c3b24dbe92::t_2613f3ebdd31e6 240-241,244-254,258
+  s_ad30c3b24dbe92::t_f66cb2b2a0cbf9 467,478,491
+  s_ad30c3b24dbe92::t_401239d9d68109 199-200,202-203
+  s_ad30c3b24dbe92::t_e989a6cb8ae78f 158-159,167-188
+  s_ad30c3b24dbe92::t_28026382448df3 82
+  s_ad30c3b24dbe92::t_8ed4b8f0a3491e 7
+  s_ad30c3b24dbe92::t_e1301d3450abdd 437-439,452
+  s_ad30c3b24dbe92::t_9b107a5ee365e9 392-394,417-419
+  s_ad30c3b24dbe92::t_250b05b1999257 189
+packages/react-ui/src/test/legendInteraction.ts
+  s_ad30c3b24dbe92::t_d51e6508a01705 33-58,63
+  s_ad30c3b24dbe92::t_82cf4d3492fdd7 64-69
+packages/react-ui/src/test/chartLayout.ts
+  s_ad30c3b24dbe92::t_0c7dacc8bcb4cc 1-46
+packages/react-ui/src/components/Charts/PieChart/PieChart.test.tsx
+  s_ad30c3b24dbe92::t_55b65d0e271290 1-155
+packages/react-ui/src/components/Charts/RadialChart/RadialChart.test.tsx
+  s_ad30c3b24dbe92::t_45f438cd1ef372 1-127
+  s_ad30c3b24dbe92::t_57a64b1866e0bf 128-132
+packages/react-ui/src/components/Charts/types/Legend.ts
+  s_ad30c3b24dbe92::t_9898305128bf04 16-17
+packages/react-ui/src/components/Charts/shared/StackedLegend/StackedLegend.test.tsx
+  s_ad30c3b24dbe92::t_21fe3372bcdd26 1-157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "1f17a28fa762f7e2b474044572599fa72be888bc",
+  "prompts": {},
+  "sessions": {
+    "s_ad30c3b24dbe92": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49a6c379-0378-4ee5-924e-dc5e9b727b62",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Venkateshwaran Selvaraj <venkateshwaran.s@sarasanalytics.com>"
+    }
+  }
+}
