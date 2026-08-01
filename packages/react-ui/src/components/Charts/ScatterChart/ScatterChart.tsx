@@ -4,7 +4,12 @@ import { Cell, ScatterChart as RechartsScatterChart, Scatter, XAxis, YAxis } fro
 import { usePrintContext } from "../../../context/PrintContext";
 import { ChartConfig, ChartContainer, ChartTooltip } from "../Charts";
 import { SideBarChartData, SideBarTooltipProvider } from "../context/SideBarTooltipContext";
-import { useExportChartData, useYAxisLabelWidth } from "../hooks";
+import {
+  useExportChartData,
+  useInteractiveLegend,
+  useYAxisLabelWidth,
+  type SeriesVisibilityChange,
+} from "../hooks";
 import {
   CustomTooltipContent,
   DefaultLegend,
@@ -13,8 +18,7 @@ import {
   SVGXAxisTick,
   YAxisTick,
 } from "../shared";
-import { LegendItem } from "../types";
-import { get2dChartConfig, getLegendItems } from "../utils/dataUtils";
+import { get2dChartConfig } from "../utils/dataUtils";
 import { PaletteName, useChartPalette } from "../utils/PalletUtils";
 import { numberTickFormatter } from "../utils/styleUtils";
 import ScatterDot from "./components/ScatterDot";
@@ -40,6 +44,17 @@ export interface ScatterChartProps {
   height?: number | string;
   width?: number | string;
   shape?: "circle" | "square";
+  /**
+   * Legend click hides/shows a dataset and double click isolates it. Set to
+   * `false` for a plain, static legend.
+   */
+  interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which datasets are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const DEFAULT_CHART_HEIGHT = 296;
@@ -60,6 +75,8 @@ export const ScatterChart = ({
   height,
   width,
   shape = "circle",
+  interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: ScatterChartProps) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -68,6 +85,8 @@ export const ScatterChart = ({
     return getScatterDatasets(data);
   }, [data]);
 
+  // Palette length is driven by the FULL dataset list: colors are assigned
+  // positionally (middle-out), so hiding a dataset must never shrink this.
   const colors = useChartPalette({
     chartThemeName: theme,
     customPalette,
@@ -75,6 +94,16 @@ export const ScatterChart = ({
     dataLength: datasets.length,
   });
 
+  // Visibility keys for a scatter chart are dataset identifiers, not data keys.
+  const { hiddenKeys, legendItems, legendInteractionProps } = useInteractiveLegend({
+    dataKeys: datasets,
+    colors,
+    enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
+  });
+
+  // Points are transformed over the FULL dataset list so every dataset keeps
+  // its positional color, then filtered down to what is actually drawn.
   const transformedData: ScatterPoint[] = useMemo(() => {
     if (!data || !Array.isArray(data)) {
       return [];
@@ -82,7 +111,26 @@ export const ScatterChart = ({
     return transformScatterData(data, datasets, colors);
   }, [data, datasets, colors]);
 
-  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(transformedData, [yAxisDataKey]);
+  const visibleTransformedData: ScatterPoint[] = useMemo(() => {
+    if (hiddenKeys.size === 0) {
+      return transformedData;
+    }
+    return transformedData.filter((point) => !hiddenKeys.has(point["dataset"] as string));
+  }, [transformedData, hiddenKeys]);
+
+  // Domains are derived from the visible datasets only, so both axes rescale.
+  const visibleData: ScatterChartData = useMemo(() => {
+    // Same guard as `transformedData` above: `data` is not trusted to be an array.
+    if (!data || !Array.isArray(data)) {
+      return [];
+    }
+    if (hiddenKeys.size === 0) {
+      return data;
+    }
+    return data.filter((dataset) => !hiddenKeys.has(dataset.name));
+  }, [data, hiddenKeys]);
+
+  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(visibleTransformedData, [yAxisDataKey]);
 
   const chartConfig: ChartConfig = useMemo(() => {
     return get2dChartConfig(
@@ -141,12 +189,12 @@ export const ScatterChart = ({
 
   // Calculate domains for x and y axes
   const xDomain = useMemo(() => {
-    return calculateScatterDomain(data, xAxisDataKey as "x" | "y");
-  }, [data, xAxisDataKey]);
+    return calculateScatterDomain(visibleData, xAxisDataKey as "x" | "y");
+  }, [visibleData, xAxisDataKey]);
 
   const yDomain = useMemo(() => {
-    return calculateScatterDomain(data, yAxisDataKey as "x" | "y");
-  }, [data, yAxisDataKey]);
+    return calculateScatterDomain(visibleData, yAxisDataKey as "x" | "y");
+  }, [visibleData, yAxisDataKey]);
 
   const renderDotShape = useMemo(() => {
     return (props: unknown) => {
@@ -181,10 +229,6 @@ export const ScatterChart = ({
     setIsLegendExpanded(false);
   }, [datasets]);
 
-  const legendItems: LegendItem[] = useMemo(() => {
-    return getLegendItems(datasets, colors);
-  }, [datasets, colors]);
-
   const exportData = useExportChartData({
     type: "scatter",
     data,
@@ -214,7 +258,7 @@ export const ScatterChart = ({
         >
           <RechartsScatterChart
             key={`x-axis-scatter-chart-${id}`}
-            data={transformedData}
+            data={visibleTransformedData}
             margin={{
               top: 10,
               bottom: 0,
@@ -235,7 +279,7 @@ export const ScatterChart = ({
             />
             {/* Invisible scatter to maintain scale synchronization */}
             <Scatter
-              data={transformedData}
+              data={visibleTransformedData}
               fill="transparent"
               isAnimationActive={isAnimationActive}
               shape="circle"
@@ -246,7 +290,7 @@ export const ScatterChart = ({
     );
   }, [
     chartConfig,
-    transformedData,
+    visibleTransformedData,
     id,
     xDomain,
     xAxisDataKey,
@@ -261,7 +305,7 @@ export const ScatterChart = ({
           key={`y-axis-scatter-chart-${id}`}
           width={yAxisWidth}
           height={chartHeight + 10}
-          data={transformedData}
+          data={visibleTransformedData}
           margin={{
             top: 10,
             bottom: 12,
@@ -282,7 +326,7 @@ export const ScatterChart = ({
           />
           {/* Invisible scatter to maintain scale synchronization */}
           <Scatter
-            data={transformedData}
+            data={visibleTransformedData}
             fill="transparent"
             isAnimationActive={isAnimationActive}
             shape="circle"
@@ -291,7 +335,7 @@ export const ScatterChart = ({
       </div>
     );
   }, [
-    transformedData,
+    visibleTransformedData,
     id,
     yAxisWidth,
     chartHeight,
@@ -381,11 +425,11 @@ export const ScatterChart = ({
 
                   <Scatter
                     key={`scatter-${id}`}
-                    data={transformedData}
+                    data={visibleTransformedData}
                     shape={renderDotShape}
                     isAnimationActive={isAnimationActive}
                   >
-                    {transformedData.map((entry, index) => (
+                    {visibleTransformedData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry["color"] as string} />
                     ))}
                   </Scatter>
@@ -405,6 +449,7 @@ export const ScatterChart = ({
               containerWidth={containerWidth}
               isExpanded={isLegendExpanded}
               setIsExpanded={setIsLegendExpanded}
+              {...legendInteractionProps}
             />
           )}
         </div>

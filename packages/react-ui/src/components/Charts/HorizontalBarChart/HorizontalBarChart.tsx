@@ -5,7 +5,12 @@ import { usePrintContext } from "../../../context/PrintContext";
 import { useTheme } from "../../ThemeProvider";
 import { ChartConfig, ChartContainer, ChartTooltip } from "../Charts";
 import { SideBarChartData, SideBarTooltipProvider } from "../context/SideBarTooltipContext";
-import { useExportChartData, useTransformedKeys } from "../hooks";
+import {
+  useExportChartData,
+  useInteractiveLegend,
+  useTransformedKeys,
+  type SeriesVisibilityChange,
+} from "../hooks";
 import { useHorizontalBarLabelHeight } from "../hooks/useMaxLabelHeight";
 import {
   CustomTooltipContent,
@@ -17,7 +22,6 @@ import {
 } from "../shared";
 import { ScrollButtonsVertical } from "../shared/ScrollButtonsVertical";
 
-import { type LegendItem } from "../types/Legend";
 import { useChartPalette, type PaletteName } from "../utils/PalletUtils";
 
 import { LabelTooltipProvider } from "../shared/LabelTooltip/LabelTooltip";
@@ -26,12 +30,7 @@ import {
   getBarStackInfo,
   getRadiusArray,
 } from "../utils/BarCharts/BarChartsUtils";
-import {
-  get2dChartConfig,
-  getColorForDataKey,
-  getDataKeys,
-  getLegendItems,
-} from "../utils/dataUtils";
+import { get2dChartConfig, getColorForDataKey, getDataKeys } from "../utils/dataUtils";
 import { numberTickFormatter } from "../utils/styleUtils";
 import { CustomBarShape } from "./components/CustomBarShape";
 import { useMaxCategoryLabelWidth } from "./hooks/useMaxCategoryLabelWidth";
@@ -65,6 +64,17 @@ export interface HorizontalBarChartProps<T extends HorizontalBarChartData> {
   className?: string;
   height?: number;
   width?: number;
+  /**
+   * Legend click hides/shows a series and double click isolates it. Set to
+   * `false` for a plain, static legend.
+   */
+  interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const X_AXIS_HEIGHT = 40; // Height of X-axis chart when shown
@@ -89,6 +99,8 @@ const HorizontalBarChartComponent = <T extends HorizontalBarChartData>({
   className,
   height,
   width,
+  interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: HorizontalBarChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -123,11 +135,21 @@ const HorizontalBarChartComponent = <T extends HorizontalBarChartData>({
 
   const transformedKeys = useTransformedKeys(dataKeys);
 
+  // Palette length is driven by the FULL key list: colors are assigned
+  // positionally (middle-out), so hiding a series must never shrink this.
   const colors = useChartPalette({
     chartThemeName: theme,
     customPalette,
     themePaletteName: "barChartPalette",
     dataLength: dataKeys.length,
+  });
+
+  const { visibleKeys, legendItems, legendInteractionProps } = useInteractiveLegend({
+    dataKeys,
+    colors,
+    icons,
+    enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
   });
 
   const chartConfig: ChartConfig = useMemo(() => {
@@ -239,11 +261,8 @@ const HorizontalBarChartComponent = <T extends HorizontalBarChartData>({
     };
   }, [updateScrollState]);
 
-  // Memoize legend items creation
-  const legendItems: LegendItem[] = useMemo(() => {
-    return getLegendItems(dataKeys, colors, icons);
-  }, [dataKeys, colors, icons]);
-
+  // Export deliberately covers the FULL series list: it is the chart's data,
+  // not the current view, so hidden series must still be exported.
   const exportData = useExportChartData({
     type: "bar",
     data,
@@ -294,8 +313,9 @@ const HorizontalBarChartComponent = <T extends HorizontalBarChartData>({
               tickFormatter={numberTickFormatter}
               tick={<SVGXAxisTick />}
             />
-            {/* Invisible bars to maintain scale synchronization */}
-            {dataKeys.map((key) => {
+            {/* Invisible bars to maintain scale synchronization. Only the
+                visible series are drawn so the shared X domain rescales. */}
+            {visibleKeys.map((key) => {
               return (
                 <Bar
                   key={`x-axis-horizontal-bar-chart-${key}`}
@@ -311,7 +331,7 @@ const HorizontalBarChartComponent = <T extends HorizontalBarChartData>({
         </ChartContainer>
       </div>
     );
-  }, [showXAxis, chartConfig, data, dataKeys, variant, id]);
+  }, [showXAxis, chartConfig, data, visibleKeys, variant, id]);
 
   // Handle mouse events for group hovering
   const handleChartMouseMove = useCallback((state: any) => {
@@ -421,7 +441,7 @@ const HorizontalBarChartComponent = <T extends HorizontalBarChartData>({
                       offset={15}
                     />
 
-                    {dataKeys.map((key, index) => {
+                    {visibleKeys.map((key, index) => {
                       const transformedKey = transformedKeys[key];
                       const color = `var(--color-${transformedKey})`;
 
@@ -437,12 +457,14 @@ const HorizontalBarChartComponent = <T extends HorizontalBarChartData>({
                           shape={(props: any) => {
                             const { payload, value, dataKey } = props;
 
+                            // Visible keys, so the rounded end lands on the
+                            // last *rendered* bar of the stack.
                             const { isNegative, isFirstInStack, isLastInStack } = getBarStackInfo(
                               variant,
                               value,
                               dataKey,
                               payload,
-                              dataKeys,
+                              visibleKeys,
                             );
 
                             const customRadius = getRadiusArray(
@@ -498,6 +520,7 @@ const HorizontalBarChartComponent = <T extends HorizontalBarChartData>({
               containerWidth={effectiveWidth}
               isExpanded={isLegendExpanded}
               setIsExpanded={setIsLegendExpanded}
+              {...legendInteractionProps}
             />
           )}
         </div>

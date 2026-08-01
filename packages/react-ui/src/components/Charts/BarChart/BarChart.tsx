@@ -7,9 +7,11 @@ import { ChartConfig, ChartContainer, ChartTooltip } from "../Charts";
 import { SideBarChartData, SideBarTooltipProvider } from "../context/SideBarTooltipContext";
 import {
   useExportChartData,
+  useInteractiveLegend,
   useMaxLabelHeight,
   useTransformedKeys,
   useYAxisLabelWidth,
+  type SeriesVisibilityChange,
 } from "../hooks";
 import {
   cartesianGrid,
@@ -24,7 +26,6 @@ import {
 
 import { ScrollButtonsHorizontal } from "../shared/ScrollButtonsHorizontal/ScrollButtonsHorizontal";
 import { XAxisTickVariant } from "../types";
-import { type LegendItem } from "../types/Legend";
 import { useChartPalette, type PaletteName } from "../utils/PalletUtils";
 
 import { LabelTooltipProvider } from "../shared/LabelTooltip/LabelTooltip";
@@ -33,12 +34,7 @@ import {
   getBarStackInfo,
   getRadiusArray,
 } from "../utils/BarCharts/BarChartsUtils";
-import {
-  get2dChartConfig,
-  getColorForDataKey,
-  getDataKeys,
-  getLegendItems,
-} from "../utils/dataUtils";
+import { get2dChartConfig, getColorForDataKey, getDataKeys } from "../utils/dataUtils";
 import { BarChartData, BarChartVariant } from "./types";
 import {
   BAR_WIDTH,
@@ -86,6 +82,17 @@ export interface BarChartProps<T extends BarChartData> {
   secondaryDataKeys?: string[];
   /** Formats secondary (right) Y-axis tick labels. Mirrors `yAxisTickFormatter`. */
   secondaryYAxisTickFormatter?: (value: number) => string;
+  /**
+   * Legend click hides/shows a series and double click isolates it. Set to
+   * `false` for a plain, static legend.
+   */
+  interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const BAR_GAP = 10; // Gap between bars
@@ -123,6 +130,8 @@ const BarChartComponent = <T extends BarChartData>({
   tooltipValueFormatter,
   secondaryDataKeys,
   secondaryYAxisTickFormatter,
+  interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: BarChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -162,18 +171,43 @@ const BarChartComponent = <T extends BarChartData>({
     return dataKeys.filter((key) => !secondaryKeySet.has(key));
   }, [isDualAxis, dataKeys, secondaryKeySet]);
 
-  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, primaryKeys);
-  const { yAxisWidth: secondaryYAxisWidth, setLabelWidth: setSecondaryLabelWidth } =
-    useYAxisLabelWidth(data, secondaryKeys);
-
   const transformedKeys = useTransformedKeys(dataKeys);
 
+  // Palette length is driven by the FULL key list: colors are assigned
+  // positionally (middle-out), so hiding a series must never shrink this.
   const colors = useChartPalette({
     chartThemeName: theme,
     customPalette,
     themePaletteName: "barChartPalette",
     dataLength: dataKeys.length,
   });
+
+  const { visibleKeys, legendItems, legendInteractionProps } = useInteractiveLegend({
+    dataKeys,
+    colors,
+    icons,
+    enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
+  });
+
+  const visibleKeySet = useMemo(() => new Set(visibleKeys), [visibleKeys]);
+
+  // Axis-domain math and the shadow axis charts see only what is rendered, so
+  // the remaining series rescale when one is hidden. `isDualAxis` above stays
+  // derived from ALL keys, so the axis layout never flips on a toggle.
+  const visiblePrimaryKeys = useMemo(
+    () => primaryKeys.filter((key) => visibleKeySet.has(key)),
+    [primaryKeys, visibleKeySet],
+  );
+
+  const visibleSecondaryKeys = useMemo(
+    () => secondaryKeys.filter((key) => visibleKeySet.has(key)),
+    [secondaryKeys, visibleKeySet],
+  );
+
+  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, visiblePrimaryKeys);
+  const { yAxisWidth: secondaryYAxisWidth, setLabelWidth: setSecondaryLabelWidth } =
+    useYAxisLabelWidth(data, visibleSecondaryKeys);
 
   const chartConfig: ChartConfig = useMemo(() => {
     return get2dChartConfig(dataKeys, colors, transformedKeys, undefined, icons);
@@ -311,11 +345,8 @@ const BarChartComponent = <T extends BarChartData>({
     };
   }, [updateScrollState]);
 
-  // Memoize legend items creation
-  const legendItems: LegendItem[] = useMemo(() => {
-    return getLegendItems(dataKeys, colors, icons);
-  }, [dataKeys, colors, icons]);
-
+  // Export deliberately covers the FULL series list: it is the chart's data,
+  // not the current view, so hidden series must still be exported.
   const exportData = useExportChartData({
     type: "bar",
     data,
@@ -360,11 +391,11 @@ const BarChartComponent = <T extends BarChartData>({
             tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
           {/*
-            Invisible bars to maintain scale synchronization. Only the primary
-            series are rendered so this chart's auto-domain matches the main
-            chart's left axis, which Recharts derives from the same subset.
+            Invisible bars to maintain scale synchronization. Only the visible
+            primary series are rendered so this chart's auto-domain matches the
+            main chart's left axis, which Recharts derives from the same subset.
           */}
-          {primaryKeys.map((key) => {
+          {visiblePrimaryKeys.map((key) => {
             return (
               <Bar
                 key={`yaxis-bar-chart-${key}`}
@@ -383,12 +414,13 @@ const BarChartComponent = <T extends BarChartData>({
     showYAxis,
     chartHeight,
     data,
-    primaryKeys,
+    visiblePrimaryKeys,
     variant,
     id,
     maxLabelHeight,
     yAxisWidth,
     yAxisTickFormatter,
+    setLabelWidth,
   ]);
 
   const secondaryYAxis = useMemo(() => {
@@ -425,7 +457,7 @@ const BarChartComponent = <T extends BarChartData>({
           {/* Invisible bars to maintain scale synchronization with the main
               chart's right axis, which sees only the secondary series.
               Dual-axis mode never applies to stacked, so no stackId here. */}
-          {secondaryKeys.map((key) => {
+          {visibleSecondaryKeys.map((key) => {
             return (
               <Bar
                 key={`secondary-yaxis-bar-chart-${key}`}
@@ -444,7 +476,7 @@ const BarChartComponent = <T extends BarChartData>({
     isDualAxis,
     chartHeight,
     data,
-    secondaryKeys,
+    visibleSecondaryKeys,
     id,
     maxLabelHeight,
     secondaryYAxisWidth,
@@ -515,7 +547,7 @@ const BarChartComponent = <T extends BarChartData>({
   );
 
   const barElements = useMemo(() => {
-    return dataKeys.map((key) => {
+    return visibleKeys.map((key) => {
       const transformedKey = transformedKeys[key];
       const color = `var(--color-${transformedKey})`;
 
@@ -536,8 +568,10 @@ const BarChartComponent = <T extends BarChartData>({
           shape={(props: any) => {
             const { payload, value, dataKey } = props;
 
+            // Visible keys, so stack-position flags (and therefore the rounded
+            // corners) land on the top *rendered* bar, not on a hidden one.
             const { isNegative, isFirstInStack, isLastInStack, hasNegativeValueInStack } =
-              getBarStackInfo(variant, value, dataKey, payload, dataKeys);
+              getBarStackInfo(variant, value, dataKey, payload, visibleKeys);
 
             const customRadius = getRadiusArray(
               variant,
@@ -566,7 +600,7 @@ const BarChartComponent = <T extends BarChartData>({
       );
     });
   }, [
-    dataKeys,
+    visibleKeys,
     transformedKeys,
     variant,
     calculatedRadius,
@@ -697,6 +731,7 @@ const BarChartComponent = <T extends BarChartData>({
               containerWidth={effectiveWidth}
               isExpanded={isLegendExpanded}
               setIsExpanded={setIsLegendExpanded}
+              {...legendInteractionProps}
             />
           )}
         </div>

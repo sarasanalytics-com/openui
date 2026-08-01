@@ -14,6 +14,17 @@ interface DefaultLegendProps {
   isExpanded: boolean;
   setIsExpanded: (isExpanded: boolean) => void;
   style?: React.CSSProperties;
+  /**
+   * When provided, every legend item becomes interactive (button role, keyboard
+   * activation, pointer cursor). Without it the legend stays a plain, static list.
+   */
+  onItemClick?: (key: string) => void;
+  /**
+   * Fired on double click. A double click also fires `onItemClick` twice, so the
+   * consumer is responsible for the interplay (two toggles cancel out, leaving the
+   * isolate as the net effect).
+   */
+  onItemDoubleClick?: (key: string) => void;
 }
 
 const DefaultLegend = memo(
@@ -28,6 +39,8 @@ const DefaultLegend = memo(
         isExpanded,
         setIsExpanded,
         style,
+        onItemClick,
+        onItemDoubleClick,
       },
       ref,
     ) => {
@@ -89,26 +102,63 @@ const DefaultLegend = memo(
               "openui-chart-legend--collapsed": !isExpanded && showToggleButton,
             })}
           >
-            {displayItems.map((item) => (
-              <div key={item.key} className="openui-chart-legend-item">
-                {item.icon ? (
-                  <item.icon />
-                ) : (
-                  <div
-                    className="openui-chart-legend-item-indicator"
-                    style={{ backgroundColor: item.color }}
-                  />
-                )}
-                <div className="openui-chart-legend-item-label-container">
-                  <span className="openui-chart-legend-item-label">{item.label}</span>
-                  {item.percentage !== undefined && (
-                    <span className="openui-chart-legend-item-percentage">
-                      {item.percentage.toFixed(1)}%
-                    </span>
+            {displayItems.map((item) => {
+              const isItemHidden = item.hidden === true;
+
+              // No `aria-label`: the row's own text (label + percentage) is the
+              // accessible name, so screen readers announce what is on screen.
+              // Dimming and the pointer cursor live in the stylesheet, keyed off
+              // these data attributes.
+              const interactiveProps: React.HTMLAttributes<HTMLDivElement> = onItemClick
+                ? {
+                    role: "button",
+                    tabIndex: 0,
+                    "aria-pressed": !isItemHidden,
+                    onClick: () => onItemClick(item.key),
+                    onDoubleClick: onItemDoubleClick
+                      ? () => onItemDoubleClick(item.key)
+                      : undefined,
+                    onKeyDown: (event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      // Isolate has no pointer-free equivalent otherwise: double
+                      // click is the only other way to reach it.
+                      if (event.shiftKey && onItemDoubleClick) {
+                        onItemDoubleClick(item.key);
+                        return;
+                      }
+                      onItemClick(item.key);
+                    },
+                  }
+                : {};
+
+              return (
+                <div
+                  key={item.key}
+                  className="openui-chart-legend-item"
+                  data-interactive={onItemClick ? true : undefined}
+                  data-hidden={isItemHidden ? true : undefined}
+                  {...interactiveProps}
+                >
+                  {item.icon ? (
+                    <item.icon />
+                  ) : (
+                    <div
+                      className="openui-chart-legend-item-indicator"
+                      style={{ backgroundColor: item.color }}
+                    />
                   )}
+                  <div className="openui-chart-legend-item-label-container">
+                    <span className="openui-chart-legend-item-label">{item.label}</span>
+                    {item.percentage !== undefined && (
+                      <span className="openui-chart-legend-item-percentage">
+                        {item.percentage.toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {showToggleButton && (
               <Button

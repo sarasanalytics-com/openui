@@ -8,9 +8,11 @@ import { SideBarChartData, SideBarTooltipProvider } from "../context/SideBarTool
 import {
   useAutoAngleCalculation,
   useExportChartData,
+  useInteractiveLegend,
   useMaxLabelWidth,
   useTransformedKeys,
   useYAxisLabelWidth,
+  type SeriesVisibilityChange,
 } from "../hooks";
 import { LineChartData, LineChartVariant } from "../LineChart/types";
 import {
@@ -24,14 +26,8 @@ import {
   YAxisTick,
 } from "../shared";
 import { LabelTooltipProvider } from "../shared/LabelTooltip/LabelTooltip";
-import { LegendItem } from "../types";
 import { getLineType } from "../utils/AreaAndLine/common";
-import {
-  get2dChartConfig,
-  getColorForDataKey,
-  getDataKeys,
-  getLegendItems,
-} from "../utils/dataUtils";
+import { get2dChartConfig, getColorForDataKey, getDataKeys } from "../utils/dataUtils";
 import { PaletteName, useChartPalette } from "../utils/PalletUtils";
 
 // this a technic to get the type of the onClick event of the line chart
@@ -57,6 +53,17 @@ export interface LineChartCondensedProps<T extends LineChartData> {
   height?: number;
   width?: number;
   strokeWidth?: number;
+  /**
+   * Legend click hides/shows a series and double click isolates it. Set to
+   * `false` for a plain, static legend.
+   */
+  interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const CHART_HEIGHT = 296;
@@ -80,6 +87,8 @@ const LineChartCondensedComponent = <T extends LineChartData>({
   height = CHART_HEIGHT,
   width,
   strokeWidth = 2,
+  interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: LineChartCondensedProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -90,7 +99,27 @@ const LineChartCondensedComponent = <T extends LineChartData>({
 
   const variant = getLineType(lineChartVariant);
 
-  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, dataKeys);
+  // Palette length is driven by the FULL key list: colors are assigned
+  // positionally (middle-out), so hiding a series must never shrink this.
+  const colors = useChartPalette({
+    chartThemeName: theme,
+    customPalette,
+    themePaletteName: "lineChartPalette",
+    dataLength: dataKeys.length,
+  });
+
+  const { visibleKeys, legendItems, legendInteractionProps } = useInteractiveLegend({
+    dataKeys,
+    colors,
+    icons,
+    // Nothing to interact with when the legend is not rendered at all.
+    enabled: interactiveLegend && legend,
+    onVisibilityChange: onSeriesVisibilityChange,
+  });
+
+  // Axis width and the shadow axis chart see only the rendered series, so the
+  // remaining series rescale when one is hidden.
+  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, visibleKeys);
 
   const maxLabelWidth = useMaxLabelWidth(data, categoryKey as string);
 
@@ -125,19 +154,14 @@ const LineChartCondensedComponent = <T extends LineChartData>({
 
   const transformedKeys = useTransformedKeys(dataKeys);
 
-  const colors = useChartPalette({
-    chartThemeName: theme,
-    customPalette,
-    themePaletteName: "lineChartPalette",
-    dataLength: dataKeys.length,
-  });
-
   const chartConfig: ChartConfig = useMemo(() => {
     return get2dChartConfig(dataKeys, colors, transformedKeys, undefined, icons);
   }, [dataKeys, icons, colors, transformedKeys]);
 
   const id = useId();
 
+  // Export deliberately covers the FULL series list: it is the chart's data,
+  // not the current view, so hidden series must still be exported.
   const exportData = useExportChartData({
     type: "line",
     data,
@@ -224,14 +248,6 @@ const LineChartCondensedComponent = <T extends LineChartData>({
     setIsLegendExpanded(false);
   }, [dataKeys]);
 
-  // Memoize legend items creation
-  const legendItems: LegendItem[] = useMemo(() => {
-    if (!legend) {
-      return [];
-    }
-    return getLegendItems(dataKeys, colors, icons);
-  }, [dataKeys, colors, icons, legend]);
-
   const yAxis = useMemo(() => {
     if (!showYAxis) {
       return null;
@@ -257,8 +273,9 @@ const LineChartCondensedComponent = <T extends LineChartData>({
             axisLine={false}
             tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
-          {/* Invisible lines to maintain scale synchronization */}
-          {dataKeys.map((key) => {
+          {/* Invisible lines to maintain scale synchronization. Only the visible
+              series are drawn so this chart's domain matches the main chart. */}
+          {visibleKeys.map((key) => {
             return (
               <Line
                 key={`yaxis-line-chart-condensed-${key}`}
@@ -277,7 +294,7 @@ const LineChartCondensedComponent = <T extends LineChartData>({
     showYAxis,
     effectiveHeight,
     data,
-    dataKeys,
+    visibleKeys,
     id,
     yAxisWidth,
     chartMargin,
@@ -347,7 +364,7 @@ const LineChartCondensedComponent = <T extends LineChartData>({
                     offset={10}
                   />
 
-                  {dataKeys.map((key) => {
+                  {visibleKeys.map((key) => {
                     const transformedKey = transformedKeys[key];
                     const color = `var(--color-${transformedKey})`;
                     return (
@@ -377,6 +394,7 @@ const LineChartCondensedComponent = <T extends LineChartData>({
               containerWidth={effectiveWidth}
               isExpanded={isLegendExpanded}
               setIsExpanded={setIsLegendExpanded}
+              {...legendInteractionProps}
             />
           )}
         </div>

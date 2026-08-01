@@ -6,9 +6,11 @@ import { ChartConfig, ChartContainer, ChartTooltip } from "../Charts";
 import { SideBarChartData, SideBarTooltipProvider } from "../context/SideBarTooltipContext";
 import {
   useExportChartData,
+  useInteractiveLegend,
   useMaxLabelHeight,
   useTransformedKeys,
   useYAxisLabelWidth,
+  type SeriesVisibilityChange,
 } from "../hooks";
 import {
   ActiveDot,
@@ -21,7 +23,7 @@ import {
   YAxisTick,
 } from "../shared";
 import { LabelTooltipProvider } from "../shared/LabelTooltip/LabelTooltip";
-import { LegendItem, XAxisTickVariant } from "../types";
+import { XAxisTickVariant } from "../types";
 import {
   findNearestSnapPosition,
   getSnapPositions,
@@ -30,12 +32,7 @@ import {
 } from "../utils/AreaAndLine/AreaAndLineUtils";
 import { getLineType } from "../utils/AreaAndLine/common";
 import { PaletteName, useChartPalette } from "../utils/PalletUtils";
-import {
-  get2dChartConfig,
-  getColorForDataKey,
-  getDataKeys,
-  getLegendItems,
-} from "../utils/dataUtils";
+import { get2dChartConfig, getColorForDataKey, getDataKeys } from "../utils/dataUtils";
 import { AreaChartData, AreaChartVariant } from "./types";
 
 // this a technic to get the type of the onClick event of the bar chart
@@ -64,6 +61,17 @@ export interface AreaChartProps<T extends AreaChartData> {
   yAxisTickFormatter?: (value: number) => string;
   /** Formats tooltip values per-series, keyed on the series `dataKey`. */
   tooltipValueFormatter?: (value: number | string, dataKey: string) => React.ReactNode;
+  /**
+   * Legend click hides/shows a series and double click isolates it. Set to
+   * `false` for a plain, static legend.
+   */
+  interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const X_AXIS_PADDING = 36;
@@ -88,6 +96,8 @@ const AreaChartComponent = <T extends AreaChartData>({
   width,
   yAxisTickFormatter,
   tooltipValueFormatter,
+  interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: AreaChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -98,7 +108,26 @@ const AreaChartComponent = <T extends AreaChartData>({
 
   const variant = getLineType(areaChartVariant);
 
-  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, dataKeys);
+  // Palette length is driven by the FULL key list: colors are assigned
+  // positionally (middle-out), so hiding a series must never shrink this.
+  const colors = useChartPalette({
+    chartThemeName: theme,
+    customPalette,
+    themePaletteName: "areaChartPalette",
+    dataLength: dataKeys.length,
+  });
+
+  const { visibleKeys, legendItems, legendInteractionProps } = useInteractiveLegend({
+    dataKeys,
+    colors,
+    icons,
+    enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
+  });
+
+  // The axis width and the shadow axis chart below see only the rendered
+  // series, so the stack rescales when one is hidden.
+  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, visibleKeys);
 
   const widthOfGroup = useMemo(() => {
     return getWidthOfGroup(data);
@@ -107,13 +136,6 @@ const AreaChartComponent = <T extends AreaChartData>({
   const maxLabelHeight = useMaxLabelHeight(data, categoryKey as string, tickVariant, widthOfGroup);
 
   const transformedKeys = useTransformedKeys(dataKeys);
-
-  const colors = useChartPalette({
-    chartThemeName: theme,
-    customPalette,
-    themePaletteName: "areaChartPalette",
-    dataLength: dataKeys.length,
-  });
 
   const chartConfig: ChartConfig = useMemo(() => {
     return get2dChartConfig(dataKeys, colors, transformedKeys, undefined, icons);
@@ -235,10 +257,8 @@ const AreaChartComponent = <T extends AreaChartData>({
     };
   }, [updateScrollState]);
 
-  const legendItems: LegendItem[] = useMemo(() => {
-    return getLegendItems(dataKeys, colors, icons);
-  }, [dataKeys, colors, icons]);
-
+  // Export deliberately covers the FULL series list: it is the chart's data,
+  // not the current view, so hidden series must still be exported.
   const exportData = useExportChartData({
     type: "area",
     data,
@@ -300,8 +320,9 @@ const AreaChartComponent = <T extends AreaChartData>({
             tickFormatter={yAxisTickFormatter}
             tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
-          {/* Invisible area to maintain scale synchronization */}
-          {dataKeys.map((key) => {
+          {/* Invisible area to maintain scale synchronization. Only the visible
+              series are stacked here so the domain matches the main chart. */}
+          {visibleKeys.map((key) => {
             return (
               <Area
                 key={`y-axis-${key}`}
@@ -321,12 +342,13 @@ const AreaChartComponent = <T extends AreaChartData>({
     showYAxis,
     chartHeight,
     data,
-    dataKeys,
+    visibleKeys,
     variant,
     id,
     maxLabelHeight,
     yAxisWidth,
     yAxisTickFormatter,
+    setLabelWidth,
   ]);
 
   return (
@@ -420,7 +442,7 @@ const AreaChartComponent = <T extends AreaChartData>({
                     );
                   })}
 
-                  {dataKeys.map((key) => {
+                  {visibleKeys.map((key) => {
                     const transformedKey = transformedKeys[key];
                     const color = `var(--color-${transformedKey})`;
                     return (
@@ -461,6 +483,7 @@ const AreaChartComponent = <T extends AreaChartData>({
               containerWidth={effectiveWidth}
               isExpanded={isLegendExpanded}
               setIsExpanded={setIsLegendExpanded}
+              {...legendInteractionProps}
             />
           )}
         </div>

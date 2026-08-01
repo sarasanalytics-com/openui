@@ -6,9 +6,11 @@ import { ChartConfig, ChartContainer, ChartTooltip } from "../Charts";
 import { SideBarChartData, SideBarTooltipProvider } from "../context/SideBarTooltipContext";
 import {
   useExportChartData,
+  useInteractiveLegend,
   useMaxLabelHeight,
   useTransformedKeys,
   useYAxisLabelWidth,
+  type SeriesVisibilityChange,
 } from "../hooks";
 import {
   ActiveDot,
@@ -21,7 +23,7 @@ import {
   YAxisTick,
 } from "../shared";
 import { LabelTooltipProvider } from "../shared/LabelTooltip/LabelTooltip";
-import { LegendItem, XAxisTickVariant } from "../types";
+import { XAxisTickVariant } from "../types";
 import {
   findNearestSnapPosition,
   getSnapPositions,
@@ -30,12 +32,7 @@ import {
 } from "../utils/AreaAndLine/AreaAndLineUtils";
 import { getLineType } from "../utils/AreaAndLine/common";
 import { PaletteName, useChartPalette } from "../utils/PalletUtils";
-import {
-  get2dChartConfig,
-  getColorForDataKey,
-  getDataKeys,
-  getLegendItems,
-} from "../utils/dataUtils";
+import { get2dChartConfig, getColorForDataKey, getDataKeys } from "../utils/dataUtils";
 import { LineChartData, LineChartVariant } from "./types";
 
 type LineChartOnClick = React.ComponentProps<typeof RechartsLineChart>["onClick"];
@@ -75,6 +72,17 @@ export interface LineChartProps<T extends LineChartData> {
   secondaryDataKeys?: string[];
   /** Formats secondary (right) Y-axis tick labels. Mirrors `yAxisTickFormatter`. */
   secondaryYAxisTickFormatter?: (value: number) => string;
+  /**
+   * Legend click hides/shows a series and double click isolates it. Set to
+   * `false` for a plain, static legend.
+   */
+  interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which series are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const X_AXIS_PADDING = 36;
@@ -109,6 +117,8 @@ export const LineChart = <T extends LineChartData>({
   tooltipValueFormatter,
   secondaryDataKeys,
   secondaryYAxisTickFormatter,
+  interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: LineChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -145,9 +155,41 @@ export const LineChart = <T extends LineChartData>({
 
   const variant = getLineType(lineChartVariant);
 
-  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, primaryKeys);
+  // Palette length is driven by the FULL key list: colors are assigned
+  // positionally (middle-out), so hiding a series must never shrink this.
+  const colors = useChartPalette({
+    chartThemeName: theme,
+    customPalette,
+    themePaletteName: "lineChartPalette",
+    dataLength: dataKeys.length,
+  });
+
+  const { visibleKeys, legendItems, legendInteractionProps } = useInteractiveLegend({
+    dataKeys,
+    colors,
+    icons,
+    enabled: interactiveLegend,
+    onVisibilityChange: onSeriesVisibilityChange,
+  });
+
+  const visibleKeySet = useMemo(() => new Set(visibleKeys), [visibleKeys]);
+
+  // Axis-domain math and the shadow axis charts see only what is rendered, so
+  // the remaining series rescale when one is hidden. `isDualAxis` above stays
+  // derived from ALL keys, so the axis layout never flips on a toggle.
+  const visiblePrimaryKeys = useMemo(
+    () => primaryKeys.filter((key) => visibleKeySet.has(key)),
+    [primaryKeys, visibleKeySet],
+  );
+
+  const visibleSecondaryKeys = useMemo(
+    () => secondaryKeys.filter((key) => visibleKeySet.has(key)),
+    [secondaryKeys, visibleKeySet],
+  );
+
+  const { yAxisWidth, setLabelWidth } = useYAxisLabelWidth(data, visiblePrimaryKeys);
   const { yAxisWidth: secondaryYAxisWidth, setLabelWidth: setSecondaryLabelWidth } =
-    useYAxisLabelWidth(data, secondaryKeys);
+    useYAxisLabelWidth(data, visibleSecondaryKeys);
 
   const widthOfGroup = useMemo(() => {
     return getWidthOfGroup(data);
@@ -156,13 +198,6 @@ export const LineChart = <T extends LineChartData>({
   const maxLabelHeight = useMaxLabelHeight(data, categoryKey as string, tickVariant, widthOfGroup);
 
   const transformedKeys = useTransformedKeys(dataKeys);
-
-  const colors = useChartPalette({
-    chartThemeName: theme,
-    customPalette,
-    themePaletteName: "lineChartPalette",
-    dataLength: dataKeys.length,
-  });
 
   const chartConfig: ChartConfig = useMemo(() => {
     return get2dChartConfig(dataKeys, colors, transformedKeys, undefined, icons);
@@ -286,10 +321,8 @@ export const LineChart = <T extends LineChartData>({
     };
   }, [updateScrollState]);
 
-  const legendItems: LegendItem[] = useMemo(() => {
-    return getLegendItems(dataKeys, colors, icons);
-  }, [dataKeys, colors, icons]);
-
+  // Export deliberately covers the FULL series list: it is the chart's data,
+  // not the current view, so hidden series must still be exported.
   const exportData = useExportChartData({
     type: "line",
     data,
@@ -354,11 +387,11 @@ export const LineChart = <T extends LineChartData>({
             tick={<YAxisTick setLabelWidth={setLabelWidth} />}
           />
           {/*
-            Invisible lines to maintain scale synchronization. Only the primary
-            series are rendered so this chart's auto-domain matches the main
-            chart's left axis, which Recharts derives from the same subset.
+            Invisible lines to maintain scale synchronization. Only the visible
+            primary series are rendered so this chart's auto-domain matches the
+            main chart's left axis, which Recharts derives from the same subset.
           */}
-          {primaryKeys.map((key) => {
+          {visiblePrimaryKeys.map((key) => {
             return (
               <Line
                 key={`y-axis-${key}`}
@@ -381,12 +414,13 @@ export const LineChart = <T extends LineChartData>({
     chartHeight,
     data,
     onLineClick,
-    primaryKeys,
+    visiblePrimaryKeys,
     variant,
     isAnimationActive,
     maxLabelHeight,
     yAxisWidth,
     yAxisTickFormatter,
+    setLabelWidth,
   ]);
 
   const secondaryYAxis = useMemo(() => {
@@ -422,7 +456,7 @@ export const LineChart = <T extends LineChartData>({
           />
           {/* Invisible lines to maintain scale synchronization with the main
               chart's right axis, which sees only the secondary series. */}
-          {secondaryKeys.map((key) => {
+          {visibleSecondaryKeys.map((key) => {
             return (
               <Line
                 key={`secondary-y-axis-${key}`}
@@ -446,7 +480,7 @@ export const LineChart = <T extends LineChartData>({
     chartHeight,
     data,
     onLineClick,
-    secondaryKeys,
+    visibleSecondaryKeys,
     variant,
     isAnimationActive,
     maxLabelHeight,
@@ -536,7 +570,7 @@ export const LineChart = <T extends LineChartData>({
                   {isDualAxis && <YAxis yAxisId={LEFT_AXIS_ID} hide />}
                   {isDualAxis && <YAxis yAxisId={RIGHT_AXIS_ID} orientation="right" hide />}
 
-                  {dataKeys.map((key) => {
+                  {visibleKeys.map((key) => {
                     const transformedKey = transformedKeys[key];
                     const color = `var(--color-${transformedKey})`;
                     const dualAxisProps = isDualAxis
@@ -583,6 +617,7 @@ export const LineChart = <T extends LineChartData>({
               containerWidth={effectiveWidth}
               isExpanded={isLegendExpanded}
               setIsExpanded={setIsLegendExpanded}
+              {...legendInteractionProps}
             />
           )}
         </div>

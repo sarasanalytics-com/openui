@@ -4,7 +4,12 @@ import { Cell, Pie, PieChart as RechartsPieChart } from "recharts";
 import { usePrintContext } from "../../../context/PrintContext.js";
 import { useTheme } from "../../ThemeProvider/ThemeProvider.js";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../Charts.js";
-import { useExportChartData, useTransformedKeys } from "../hooks/index.js";
+import {
+  useCategoryVisibility,
+  useExportChartData,
+  useTransformedKeys,
+  type SeriesVisibilityChange,
+} from "../hooks/index.js";
 import { DefaultLegend } from "../shared/DefaultLegend/DefaultLegend.js";
 import { StackedLegend } from "../shared/StackedLegend/StackedLegend.js";
 import { LegendItem } from "../types/Legend.js";
@@ -44,6 +49,18 @@ export interface PieChartProps<T extends PieChartData> {
   // Add height and width props
   height?: number | string;
   width?: number | string;
+  /**
+   * Legend click hides/shows a slice and double click isolates it. Percentages
+   * and the pie itself re-base on the visible slices. Set to `false` for a plain,
+   * static legend.
+   */
+  interactiveLegend?: boolean;
+  /**
+   * Notified after a legend interaction changed which slices are visible.
+   * Guarded no-ops are not reported; a double click emits `hide`, `show` and
+   * then `isolate`.
+   */
+  onSeriesVisibilityChange?: (change: SeriesVisibilityChange) => void;
 }
 
 const STACKED_LEGEND_BREAKPOINT = 400;
@@ -73,6 +90,8 @@ const PieChartComponent = <T extends PieChartData>({
   minChartSize = MIN_CHART_SIZE,
   height,
   width,
+  interactiveLegend = true,
+  onSeriesVisibilityChange,
 }: PieChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -99,6 +118,14 @@ const PieChartComponent = <T extends PieChartData>({
     [sortedProcessedData, categoryKey],
   );
   const transformedKeys = useTransformedKeys(categories);
+
+  // Visibility is tracked per legend ROW, not per category name: two slices can
+  // legitimately carry the same label, and they must toggle (and stay colored)
+  // independently. Keys are index-disambiguated over the sorted render order.
+  const rowKeys = useMemo(
+    () => categories.map((category, index) => `${category}-${index}`),
+    [categories],
+  );
 
   // Memoize string conversions to avoid repeated calls
   const categoryKeyString = useMemo(() => String(categoryKey), [categoryKey]);
@@ -148,12 +175,52 @@ const PieChartComponent = <T extends PieChartData>({
     [],
   );
 
+  // Palette length is driven by the FULL category list: colors are assigned
+  // positionally, so hiding a slice must never shrink this.
   const colors = useChartPalette({
     chartThemeName: theme,
     customPalette,
     themePaletteName: "pieChartPalette",
     dataLength: sortedProcessedData.length,
   });
+
+  const { hiddenKeys, legendInteractionProps } = useCategoryVisibility({
+    keys: rowKeys,
+    enabled: interactiveLegend,
+    // Row keys are an internal detail; the public callback reports the plain
+    // category names. Inline arrow is fine: the hook reads this through a ref.
+    onVisibilityChange: onSeriesVisibilityChange
+      ? (change) => {
+          const categoryByRowKey = new Map(rowKeys.map((key, index) => [key, categories[index]!]));
+          onSeriesVisibilityChange({
+            ...change,
+            key: categoryByRowKey.get(change.key) ?? change.key,
+            visibleKeys: change.visibleKeys.map((key) => categoryByRowKey.get(key) ?? key),
+          });
+        }
+      : undefined,
+  });
+
+  // Indexes (into the sorted list) of the rows that are actually drawn.
+  const visibleRowIndexes = useMemo(() => {
+    const indexes: number[] = [];
+    rowKeys.forEach((key, index) => {
+      if (!hiddenKeys.has(key)) indexes.push(index);
+    });
+    return indexes;
+  }, [rowKeys, hiddenKeys]);
+
+  const visibleData = useMemo(
+    () => visibleRowIndexes.map((index) => sortedProcessedData[index]!),
+    [sortedProcessedData, visibleRowIndexes],
+  );
+
+  // Colors are positional over the FULL row list, so hiding a slice never
+  // recolors the survivors and duplicate names keep their own color.
+  const visibleColors = useMemo(
+    () => visibleRowIndexes.map((index) => colors[index] || "#000000"),
+    [visibleRowIndexes, colors],
+  );
 
   const exportData = useExportChartData({
     type: "pie",
@@ -164,10 +231,11 @@ const PieChartComponent = <T extends PieChartData>({
     legend,
   });
 
-  // Memoize expensive data transformations and configurations
+  // Only the visible slices are transformed, so the percentages re-sum to 100
+  // over what is actually drawn.
   const transformedData = useMemo(
-    () => transformDataWithPercentages(sortedProcessedData as T, dataKey),
-    [sortedProcessedData, dataKey],
+    () => transformDataWithPercentages(visibleData as T, dataKey),
+    [visibleData, dataKey],
   );
 
   const chartConfig = useMemo(
@@ -204,32 +272,36 @@ const PieChartComponent = <T extends PieChartData>({
     };
   }, [cornerRadius, variant, paddingAngle, userTheme.radius2xs]);
 
+  // Legend items cover EVERY category (hidden ones included, flagged + dimmed) so
+  // a hidden slice can be brought back.
   const legendItems = useMemo(
     () =>
-      sortedProcessedData.map((item, index) => ({
-        key: String(item[categoryKey]),
-        label: String(item[categoryKey]),
-        value: Number(item[dataKey]),
-        color: colors[index] || "#000000",
-      })),
-    [sortedProcessedData, categoryKey, dataKey, colors],
+      sortedProcessedData.map((item, index) => {
+        const rowKey = rowKeys[index]!;
+        return {
+          key: rowKey,
+          label: String(item[categoryKey]),
+          value: Number(item[dataKey]),
+          color: colors[index] || "#000000",
+          hidden: hiddenKeys.has(rowKey),
+        };
+      }),
+    [sortedProcessedData, categoryKey, dataKey, colors, hiddenKeys, rowKeys],
   );
 
   const defaultLegendItems = useMemo((): LegendItem[] => {
-    return legendItems.map(({ key, label, color }) => ({ key, label, color }));
+    return legendItems.map(({ key, label, color, hidden }) => ({ key, label, color, hidden }));
   }, [legendItems]);
 
   const handleLegendItemHover = useCallback(
     (index: number | null) => {
       if (legendVariant !== "stacked") return;
       if (index !== null) {
-        const item = sortedProcessedData[index];
-        if (item) {
-          const categoryValue = String(item[categoryKey]);
-          setHoveredLegendKey(categoryValue);
-          const transformedIndex = transformedData.findIndex(
-            (d) => String((d as any)[categoryKey]) === categoryValue,
-          );
+        const rowKey = rowKeys[index];
+        if (rowKey !== undefined) {
+          setHoveredLegendKey(rowKey);
+          // Matched by row, not by name: two slices can share a label.
+          const transformedIndex = visibleRowIndexes.indexOf(index);
           if (transformedIndex !== -1) {
             handleMouseEnter(transformedData[transformedIndex], transformedIndex);
           }
@@ -240,8 +312,8 @@ const PieChartComponent = <T extends PieChartData>({
       }
     },
     [
-      sortedProcessedData,
-      categoryKey,
+      rowKeys,
+      visibleRowIndexes,
       transformedData,
       handleMouseEnter,
       handleMouseLeave,
@@ -253,11 +325,21 @@ const PieChartComponent = <T extends PieChartData>({
     (entry: any, index: number) => {
       handleMouseEnter(entry, index);
       if (legend && legendVariant === "stacked") {
-        setHoveredLegendKey(String(entry[categoryKey]));
+        // `index` is the position in the RENDERED data, so it has to be mapped
+        // back onto the legend row it came from.
+        const rowIndex = visibleRowIndexes[index];
+        setHoveredLegendKey(rowIndex === undefined ? null : (rowKeys[rowIndex] ?? null));
       }
       eventHandlers.onMouseEnter?.(entry, index);
     },
-    [handleMouseEnter, categoryKey, legend, legendVariant, eventHandlers.onMouseEnter],
+    [
+      handleMouseEnter,
+      legend,
+      legendVariant,
+      eventHandlers.onMouseEnter,
+      rowKeys,
+      visibleRowIndexes,
+    ],
   );
 
   const handleChartMouseLeave = useCallback(() => {
@@ -345,12 +427,12 @@ const PieChartComponent = <T extends PieChartData>({
           innerRadius={dimensions.innerRadius}
           outerRadius={dimensions.middleRadius}
         >
-          {transformedData.map((entry, index: number) => {
-            const categoryValue = String(entry[categoryKey as keyof typeof entry] || "");
-            const transformedKey = transformedKeys[categoryValue] ?? categoryValue;
-            const config = chartConfig[transformedKey];
+          {transformedData.map((_entry, index: number) => {
             const hoverStyles = getHoverStyles(index, activeIndex);
-            const fill = config?.color || colors[index];
+            // Keyed on the ROW the slice came from, never on the rendered index
+            // alone: hiding a slice must not recolor the survivors, and two
+            // slices sharing a label must keep distinct colors.
+            const fill = visibleColors[index];
             return (
               <Cell
                 key={`inner-cell-${index}`}
@@ -368,12 +450,12 @@ const PieChartComponent = <T extends PieChartData>({
           innerRadius={dimensions.middleRadius}
           outerRadius={dimensions.outerRadius}
         >
-          {transformedData.map((entry, index: number) => {
-            const categoryValue = String(entry[categoryKey as keyof typeof entry] || "");
-            const transformedKey = transformedKeys[categoryValue] ?? categoryValue;
-            const config = chartConfig[transformedKey];
+          {transformedData.map((_entry, index: number) => {
             const hoverStyles = getHoverStyles(index, activeIndex);
-            const fill = config?.color || colors[index];
+            // Keyed on the ROW the slice came from, never on the rendered index
+            // alone: hiding a slice must not recolor the survivors, and two
+            // slices sharing a label must keep distinct colors.
+            const fill = visibleColors[index];
             return <Cell key={`outer-cell-${index}`} fill={fill} {...hoverStyles} stroke="none" />;
           })}
         </Pie>,
@@ -386,27 +468,17 @@ const PieChartComponent = <T extends PieChartData>({
         innerRadius={dimensions.innerRadius}
         activeIndex={activeIndex ?? undefined}
       >
-        {transformedData.map((entry, index: number) => {
-          const categoryValue = String(entry[categoryKey as keyof typeof entry] || "");
-          const transformedKey = transformedKeys[categoryValue] ?? categoryValue;
-          const config = chartConfig[transformedKey];
+        {transformedData.map((_entry, index: number) => {
           const hoverStyles = getHoverStyles(index, activeIndex);
-          const fill = config?.color || colors[index];
+          // Keyed on the ROW the slice came from, never on the rendered index
+          // alone: hiding a slice must not recolor the survivors, and two
+          // slices sharing a label must keep distinct colors.
+          const fill = visibleColors[index];
           return <Cell key={`cell-${index}`} fill={fill} {...hoverStyles} stroke="none" />;
         })}
       </Pie>
     );
-  }, [
-    variant,
-    commonPieProps,
-    dimensions,
-    transformedData,
-    categoryKey,
-    chartConfig,
-    activeIndex,
-    colors,
-    transformedKeys,
-  ]);
+  }, [variant, commonPieProps, dimensions, transformedData, activeIndex, visibleColors]);
 
   const renderLegend = useCallback(() => {
     if (!legend) return null;
@@ -419,6 +491,7 @@ const PieChartComponent = <T extends PieChartData>({
             activeKey={hoveredLegendKey}
             onLegendItemHover={handleLegendItemHover}
             containerWidth={isRowLayout ? undefined : wrapperRect.width}
+            {...legendInteractionProps}
           />
         </div>
       );
@@ -429,6 +502,7 @@ const PieChartComponent = <T extends PieChartData>({
         containerWidth={wrapperRect.width}
         isExpanded={isLegendExpanded}
         setIsExpanded={setIsLegendExpanded}
+        {...legendInteractionProps}
       />
     );
   }, [
@@ -441,6 +515,7 @@ const PieChartComponent = <T extends PieChartData>({
     isRowLayout,
     defaultLegendItems,
     isLegendExpanded,
+    legendInteractionProps,
   ]);
 
   const wrapperClassName = useMemo(

@@ -20,10 +20,21 @@ interface StackedLegendProps {
   layout?: StackedLegendLayout;
   className?: string;
   style?: React.CSSProperties;
+  /**
+   * When provided, every legend row becomes interactive (button role, keyboard
+   * activation, pointer cursor). Without it the legend stays a plain, static list.
+   */
+  onItemClick?: (key: string) => void;
+  /**
+   * Fired on double click. A double click also fires `onItemClick` twice, so the
+   * consumer is responsible for the interplay (two toggles cancel out, leaving the
+   * isolate as the net effect).
+   */
+  onItemDoubleClick?: (key: string) => void;
 }
 
 const formatPercentage = (value: number, total: number): string => {
-  const percentage = (value / total) * 100;
+  const percentage = total > 0 ? (value / total) * 100 : 0;
   return `${percentage.toFixed(1)}%`;
 };
 
@@ -43,6 +54,8 @@ export const StackedLegend = ({
   layout = "auto",
   className,
   style,
+  onItemClick,
+  onItemDoubleClick,
 }: StackedLegendProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -60,7 +73,10 @@ export const StackedLegend = ({
 
   const isScrollableLayout = layout === "scrollable" || (layout === "auto" && !isShowMoreLayout);
 
-  const handleMouseEnter = (key: string, index: number) => {
+  // Hidden rows never drive the hover highlight — the slice they point at is not
+  // rendered, so there is nothing to activate.
+  const handleMouseEnter = (key: string, index: number, hidden: boolean) => {
+    if (hidden) return;
     onItemHover?.(key);
     onLegendItemHover?.(index);
   };
@@ -123,8 +139,12 @@ export const StackedLegend = ({
     }
   };
 
-  // Calculate total for percentage
+  // Percentages re-sum to 100 over the VISIBLE items, so the numbers keep matching
+  // what the chart actually draws. A hidden row keeps showing its share of the full
+  // total, which is what it was before it got hidden. With nothing hidden the two
+  // totals are identical, so the rendered output is unchanged.
   const total = items.reduce((sum, item) => sum + item.value, 0);
+  const visibleTotal = items.reduce((sum, item) => (item.hidden ? sum : sum + item.value), 0);
 
   // Items are already sorted by the parent component, so we use them as-is
   const itemsToDisplay = isShowMoreLayout && !showAll ? items.slice(0, 6) : items;
@@ -172,33 +192,66 @@ export const StackedLegend = ({
         </div>
       )}
       <div ref={listRef} className="openui-stacked-legend">
-        {itemsToDisplay.map((item, index) => (
-          <React.Fragment key={item.key}>
-            <div
-              className={`openui-stacked-legend__item ${
-                activeKey === item.key ? "openui-stacked-legend__item--active" : ""
-              }`}
-              onMouseEnter={() => handleMouseEnter(item.key, index)}
-              onMouseLeave={handleMouseLeave}
-            >
-              <div className="openui-stacked-legend__item-label">
-                <div className="openui-stacked-legend__item-color-container">
-                  <div
-                    className="openui-stacked-legend__item-color"
-                    style={{ backgroundColor: item.color }}
-                  />
+        {itemsToDisplay.map((item, index) => {
+          const isItemHidden = item.hidden === true;
+
+          // No `aria-label`: the row's own text (label + percentage) is the
+          // accessible name, so screen readers announce what is on screen.
+          // Dimming lives in the stylesheet, keyed off `data-hidden`.
+          const interactiveProps: React.HTMLAttributes<HTMLDivElement> = onItemClick
+            ? {
+                role: "button",
+                tabIndex: 0,
+                "aria-pressed": !isItemHidden,
+                onClick: () => onItemClick(item.key),
+                onDoubleClick: onItemDoubleClick ? () => onItemDoubleClick(item.key) : undefined,
+                onKeyDown: (event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  // Isolate has no pointer-free equivalent otherwise: double
+                  // click is the only other way to reach it.
+                  if (event.shiftKey && onItemDoubleClick) {
+                    onItemDoubleClick(item.key);
+                    return;
+                  }
+                  onItemClick(item.key);
+                },
+              }
+            : {};
+
+          return (
+            <React.Fragment key={item.key}>
+              <div
+                className={`openui-stacked-legend__item ${
+                  activeKey === item.key && !isItemHidden
+                    ? "openui-stacked-legend__item--active"
+                    : ""
+                }`}
+                data-interactive={onItemClick ? true : undefined}
+                data-hidden={isItemHidden ? true : undefined}
+                onMouseEnter={() => handleMouseEnter(item.key, index, isItemHidden)}
+                onMouseLeave={handleMouseLeave}
+                {...interactiveProps}
+              >
+                <div className="openui-stacked-legend__item-label">
+                  <div className="openui-stacked-legend__item-color-container">
+                    <div
+                      className="openui-stacked-legend__item-color"
+                      style={{ backgroundColor: item.color }}
+                    />
+                  </div>
+                  <div className="openui-stacked-legend__item-label-text">{item.label}</div>
                 </div>
-                <div className="openui-stacked-legend__item-label-text">{item.label}</div>
+                <div className="openui-stacked-legend__item-value">
+                  {formatPercentage(item.value, isItemHidden ? total : visibleTotal)}
+                </div>
               </div>
-              <div className="openui-stacked-legend__item-value">
-                {formatPercentage(item.value, total)}
-              </div>
-            </div>
-            {index !== itemsToDisplay.length - 1 && separator && (
-              <Separator className="openui-stacked-legend-separator" />
-            )}
-          </React.Fragment>
-        ))}
+              {index !== itemsToDisplay.length - 1 && separator && (
+                <Separator className="openui-stacked-legend-separator" />
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
       {isShowMoreLayout && !showAll && items.length > LEGEND_ITEM_LIMIT && (
         <Button
