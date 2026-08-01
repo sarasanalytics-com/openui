@@ -2,7 +2,7 @@ import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrintContext } from "../../../context/PrintContext";
 import { Separator } from "../../Separator";
-import { useExportChartData } from "../hooks";
+import { useCategoryVisibility, useExportChartData } from "../hooks";
 import { DefaultLegend } from "../shared/DefaultLegend/DefaultLegend";
 import { FloatingUIPortal } from "../shared/PortalTooltip";
 import { StackedLegend } from "../shared/StackedLegend/StackedLegend";
@@ -22,6 +22,12 @@ export interface SingleStackedBarProps<T extends SingleStackedBarData> {
   className?: string;
   style?: React.CSSProperties;
   animated?: boolean;
+  /**
+   * Legend click hides/shows a segment and double click isolates it. Segment
+   * widths and percentages re-base on the visible segments. Set to `false` for a
+   * plain, static legend.
+   */
+  interactiveLegend?: boolean;
 }
 
 export const SingleStackedBar = <T extends SingleStackedBarData>({
@@ -35,6 +41,7 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
   className,
   style,
   animated = true,
+  interactiveLegend = true,
 }: SingleStackedBarProps<T>) => {
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -57,21 +64,27 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
     observer.observe(wrapper);
     return () => observer.disconnect();
   }, []);
-  // Calculate percentages
+  // The raw segments, in data order. Never filtered: the palette is positional
+  // over this list and legend rows must survive being hidden.
   const segments = useMemo(() => {
     if (!data || data.length === 0) {
       return [];
     }
 
-    const total = data.reduce((acc, item) => acc + Number(item[dataKey]), 0);
-
     return data.map((item, index) => ({
       value: Number(item[dataKey]),
       category: String(item[categoryKey]),
       index,
-      percentage: total > 0 ? (Number(item[dataKey]) / total) * 100 : 0,
+      key: `${String(item[categoryKey])}-${index}`,
     }));
   }, [data, dataKey, categoryKey]);
+
+  const segmentKeys = useMemo(() => segments.map((segment) => segment.key), [segments]);
+
+  const { hiddenKeys, legendInteractionProps } = useCategoryVisibility({
+    keys: segmentKeys,
+    enabled: interactiveLegend,
+  });
 
   // Get theme colors for each segment
   const colors = useChartPalette({
@@ -81,26 +94,58 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
     dataLength: Math.max(segments.length, 1),
   });
 
+  // Widths and percentages re-base on the VISIBLE segments, so the bar always
+  // fills 100%. A hidden segment keeps reporting its share of the full total,
+  // which is what it was before it got hidden. With nothing hidden the two
+  // totals are identical, so the rendered output is unchanged.
+  const decoratedSegments = useMemo(() => {
+    const total = segments.reduce((acc, segment) => acc + segment.value, 0);
+    const visibleTotal = segments.reduce(
+      (acc, segment) => (hiddenKeys.has(segment.key) ? acc : acc + segment.value),
+      0,
+    );
+
+    return segments.map((segment) => {
+      const hidden = hiddenKeys.has(segment.key);
+      const basis = hidden ? total : visibleTotal;
+      return {
+        ...segment,
+        hidden,
+        // Colors are positional over the FULL segment list, so hiding one must
+        // not recolor the survivors.
+        color: colors[segment.index % colors.length] || "",
+        percentage: basis > 0 ? (segment.value / basis) * 100 : 0,
+      };
+    });
+  }, [segments, colors, hiddenKeys]);
+
+  const visibleSegments = useMemo(
+    () => decoratedSegments.filter((segment) => !segment.hidden),
+    [decoratedSegments],
+  );
+
   // Create legend items
   const legendItems = useMemo((): LegendItem[] => {
-    return segments.map((segment, index) => ({
-      key: `${segment.category}-${index}`,
+    return decoratedSegments.map((segment) => ({
+      key: segment.key,
       label: segment.category,
-      color: colors[index % colors.length] || "",
+      color: segment.color,
       percentage: segment.percentage,
+      hidden: segment.hidden,
     }));
-  }, [segments, colors]);
+  }, [decoratedSegments]);
 
   // Create stacked legend items with values
   const stackedLegendItems = useMemo(
     (): StackedLegendItem[] =>
-      segments.map((segment, index) => ({
-        key: `${segment.category}-${index}`,
+      decoratedSegments.map((segment) => ({
+        key: segment.key,
         label: segment.category,
         value: segment.value,
-        color: colors[index % colors.length] || "",
+        color: segment.color,
+        hidden: segment.hidden,
       })),
-    [segments, colors],
+    [decoratedSegments],
   );
 
   const printContext = usePrintContext();
@@ -122,34 +167,37 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
   // Handle legend item hover with tooltip positioning
   const handleLegendItemHover = useCallback(
     (hoverIndex: number | null) => {
-      setActiveIndex(hoverIndex);
-      if (hoverIndex !== null) {
-        const segment = segments[hoverIndex];
-        if (segment) {
-          const legendKey = `${segment.category}-${hoverIndex}`;
-          setHoveredLegendKey(legendKey);
-        }
-        // Try to position tooltip above the hovered segment
-        const segmentEl = wrapperRef.current?.querySelectorAll(
-          ".openui-single-stacked-bar-chart-segment",
-        )?.[hoverIndex] as HTMLDivElement | undefined;
-        if (segmentEl) {
-          const rect = segmentEl.getBoundingClientRect();
-          const containerRect = wrapperRef.current?.getBoundingClientRect();
-          if (containerRect) {
-            const relativeX = rect.left + rect.width / 2 - containerRect.left;
-            const relativeY = rect.top - containerRect.top;
-            setTooltipPosition({ x: relativeX, y: relativeY });
-          } else {
-            setTooltipPosition({ x: rect.left + rect.width / 2, y: rect.top });
-          }
-        }
-      } else {
+      const segment = hoverIndex === null ? undefined : decoratedSegments[hoverIndex];
+      // A hidden segment has no rendered element to point the tooltip at.
+      if (hoverIndex === null || !segment || segment.hidden) {
+        setActiveIndex(null);
         setHoveredLegendKey(null);
         setTooltipPosition(null);
+        return;
+      }
+
+      setActiveIndex(hoverIndex);
+      setHoveredLegendKey(segment.key);
+
+      // Only the visible segments are in the DOM, so the legend index has to be
+      // mapped onto the rendered position.
+      const renderedIndex = visibleSegments.findIndex((item) => item.index === segment.index);
+      const segmentEl = wrapperRef.current?.querySelectorAll(
+        ".openui-single-stacked-bar-chart-segment",
+      )?.[renderedIndex] as HTMLDivElement | undefined;
+      if (segmentEl) {
+        const rect = segmentEl.getBoundingClientRect();
+        const containerRect = wrapperRef.current?.getBoundingClientRect();
+        if (containerRect) {
+          const relativeX = rect.left + rect.width / 2 - containerRect.left;
+          const relativeY = rect.top - containerRect.top;
+          setTooltipPosition({ x: relativeX, y: relativeY });
+        } else {
+          setTooltipPosition({ x: rect.left + rect.width / 2, y: rect.top });
+        }
       }
     },
-    [segments],
+    [decoratedSegments, visibleSegments],
   );
 
   // Segmented progress bar
@@ -163,7 +211,8 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
       data-openui-chart={exportData}
     >
       <div className="openui-single-stacked-bar-chart">
-        {segments.map((segment, index) => {
+        {visibleSegments.map((segment) => {
+          const index = segment.index;
           const isActive = activeIndex === null || activeIndex === index;
           return (
             <div
@@ -173,13 +222,12 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
               })}
               style={{
                 width: `${segment.percentage}%`,
-                backgroundColor: colors[index % colors.length],
+                backgroundColor: segment.color,
                 opacity: isActive ? 1 : 0.5,
               }}
               onMouseEnter={(e) => {
                 setActiveIndex(index);
-                const legendKey = `${segment.category}-${index}`;
-                setHoveredLegendKey(legendKey);
+                setHoveredLegendKey(segment.key);
                 const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
                 const containerRect = wrapperRef.current?.getBoundingClientRect();
                 if (containerRect) {
@@ -207,7 +255,7 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
             label={legendItems[activeIndex]?.label ?? ""}
             color={stackedLegendItems[activeIndex]?.color ?? "#000000"}
             value={stackedLegendItems[activeIndex]?.value ?? 0}
-            percentage={segments[activeIndex]?.percentage ?? 0}
+            percentage={decoratedSegments[activeIndex]?.percentage ?? 0}
           />
         </FloatingUIPortal>
       )}
@@ -221,6 +269,7 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
           setIsExpanded={setIsLegendExpanded}
           containerWidth={containerWidth}
           style={{ paddingTop: 0 }}
+          {...legendInteractionProps}
         />
       )}
       {legend && legendVariant === "stacked" && (
@@ -234,6 +283,7 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
           showTitle={false}
           layout="showMore"
           className="openui-single-stacked-bar-chart-stacked-legend"
+          {...legendInteractionProps}
         />
       )}
     </div>

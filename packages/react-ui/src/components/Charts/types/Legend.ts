@@ -13,4 +13,6 @@ export interface StackedLegendItem {
   label: string;
   value: number;
   color: string;
+  /** When true the slice/segment is hidden and the legend row renders dimmed. */
+  hidden?: boolean;
 }

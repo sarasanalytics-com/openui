@@ -1,5 +1,6 @@
 export * from "./useAutoAngleCalculation";
 export * from "./useCanvasContextForLabelSize";
+export * from "./useCategoryVisibility";
 export * from "./useExportChartData";
 export * from "./useInteractiveLegend";
 export * from "./useMaxLabelHeight";

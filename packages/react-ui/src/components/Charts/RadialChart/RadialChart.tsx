@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cell, PolarGrid, RadialBar, RadialBarChart, ResponsiveContainer } from "recharts";
 import { usePrintContext } from "../../../context/PrintContext";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../Charts";
-import { useExportChartData, useTransformedKeys } from "../hooks";
+import { useCategoryVisibility, useExportChartData, useTransformedKeys } from "../hooks";
 import { DefaultLegend } from "../shared/DefaultLegend/DefaultLegend";
 import { StackedLegend } from "../shared/StackedLegend/StackedLegend";
 import { LegendItem } from "../types/Legend";
@@ -40,6 +40,11 @@ export interface RadialChartProps<T extends RadialChartData> {
   minChartSize?: number;
   height?: number | string;
   width?: number | string;
+  /**
+   * Legend click hides/shows a category and double click isolates it. Percentages
+   * re-base on the visible categories. Set to `false` for a plain, static legend.
+   */
+  interactiveLegend?: boolean;
 }
 
 const STACKED_LEGEND_BREAKPOINT = 400;
@@ -67,6 +72,7 @@ export const RadialChart = <T extends RadialChartData>({
   minChartSize = MIN_CHART_SIZE,
   height,
   width,
+  interactiveLegend = true,
 }: RadialChartProps<T>) => {
   const printContext = usePrintContext();
   isAnimationActive = printContext ? false : isAnimationActive;
@@ -142,13 +148,45 @@ export const RadialChart = <T extends RadialChartData>({
   // Calculate chart radii
   const dimensions = useMemo(() => calculateRadialChartDimensions(chartSize), [chartSize]);
 
-  // Get color palette and distribute colors
+  // Get color palette and distribute colors. Palette length is driven by the FULL
+  // category list: colors are assigned positionally, so hiding a category must
+  // never shrink this.
   const colors = useChartPalette({
     chartThemeName: theme,
     customPalette,
     themePaletteName: "radialChartPalette",
     dataLength: sortedProcessedData.length,
   });
+
+  const { hiddenKeys, legendInteractionProps } = useCategoryVisibility({
+    keys: categories,
+    enabled: interactiveLegend,
+  });
+
+  // Category -> color over the FULL list, so the survivors keep their color when
+  // a category is hidden and the rendered data shrinks.
+  const colorByCategory = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach((category, index) => {
+      map[category] = colors[index] || "#000000";
+    });
+    return map;
+  }, [categories, colors]);
+
+  const visibleData = useMemo(
+    () =>
+      hiddenKeys.size === 0
+        ? sortedProcessedData
+        : sortedProcessedData.filter((item) => !hiddenKeys.has(String(item[categoryKey]))),
+    [sortedProcessedData, categoryKey, hiddenKeys],
+  );
+
+  // `transformRadialDataWithPercentages` assigns `fill` positionally from the
+  // array it is handed, so it gets colors aligned to the VISIBLE rows.
+  const visibleColors = useMemo(
+    () => visibleData.map((item) => colorByCategory[String(item[categoryKey])] || "#000000"),
+    [visibleData, categoryKey, colorByCategory],
+  );
 
   const exportData = useExportChartData({
     type: "pie",
@@ -159,10 +197,11 @@ export const RadialChart = <T extends RadialChartData>({
     legend,
   });
 
-  // Memoize expensive data transformations and configurations
+  // Only the visible categories are transformed, so the percentages re-sum to 100
+  // over what is actually drawn.
   const transformedData = useMemo(
-    () => transformRadialDataWithPercentages(sortedProcessedData as T, dataKey, colors),
-    [sortedProcessedData, dataKey, colors],
+    () => transformRadialDataWithPercentages(visibleData as T, dataKey, visibleColors),
+    [visibleData, dataKey, visibleColors],
   );
 
   const chartConfig = useMemo(
@@ -180,20 +219,25 @@ export const RadialChart = <T extends RadialChartData>({
     [onMouseEnter, onMouseLeave, onClick],
   );
 
-  // Create legend items for both variants
+  // Create legend items for both variants. They cover EVERY category (hidden ones
+  // included, flagged + dimmed) so a hidden category can be brought back.
   const legendItems = useMemo(
     () =>
-      sortedProcessedData.map((item, index) => ({
-        key: String(item[categoryKey]),
-        label: String(item[categoryKey]),
-        value: Number(item[dataKey]),
-        color: colors[index] || "#000000",
-      })),
-    [sortedProcessedData, categoryKey, dataKey, colors],
+      sortedProcessedData.map((item, index) => {
+        const key = String(item[categoryKey]);
+        return {
+          key,
+          label: key,
+          value: Number(item[dataKey]),
+          color: colors[index] || "#000000",
+          hidden: hiddenKeys.has(key),
+        };
+      }),
+    [sortedProcessedData, categoryKey, dataKey, colors, hiddenKeys],
   );
 
   const defaultLegendItems = useMemo((): LegendItem[] => {
-    return legendItems.map(({ key, label, color }) => ({ key, label, color }));
+    return legendItems.map(({ key, label, color, hidden }) => ({ key, label, color, hidden }));
   }, [legendItems]);
 
   // Handle legend item hover to highlight radial bar
@@ -278,6 +322,7 @@ export const RadialChart = <T extends RadialChartData>({
             activeKey={hoveredLegendKey}
             onLegendItemHover={handleLegendItemHover}
             containerWidth={isRowLayout ? undefined : wrapperRect.width}
+            {...legendInteractionProps}
           />
         </div>
       );
@@ -288,6 +333,7 @@ export const RadialChart = <T extends RadialChartData>({
         containerWidth={wrapperRect.width}
         isExpanded={isLegendExpanded}
         setIsExpanded={setIsLegendExpanded}
+        {...legendInteractionProps}
       />
     );
   }, [
@@ -300,6 +346,7 @@ export const RadialChart = <T extends RadialChartData>({
     isRowLayout,
     defaultLegendItems,
     isLegendExpanded,
+    legendInteractionProps,
   ]);
 
   const wrapperClassName = clsx("openui-radial-chart-container-wrapper", className, {
@@ -382,7 +429,9 @@ export const RadialChart = <T extends RadialChartData>({
                     const categoryValue = String(entry[categoryKey as keyof typeof entry] || "");
                     const config = chartConfig[categoryValue];
                     const hoverStyles = getRadialHoverStyles(index, activeIndex);
-                    const fill = config?.color || colors[index];
+                    // Keyed on the category, never on the rendered index: hiding
+                    // a category must not recolor the survivors.
+                    const fill = config?.color || colorByCategory[categoryValue];
                     return (
                       <Cell key={`cell-${index}`} fill={fill} {...hoverStyles} stroke="none" />
                     );
