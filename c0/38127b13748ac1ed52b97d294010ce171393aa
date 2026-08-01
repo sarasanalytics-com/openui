@@ -1,0 +1,80 @@
+packages/react-ui/src/components/Charts/ScatterChart/ScatterChart.tsx
+  s_56e1e756863a98::t_34eab41d0fb863 86
+  s_56e1e756863a98::t_bf2e83de46b938 85
+  s_56e1e756863a98::t_d80be6fcd9fd50 87-89
+  s_56e1e756863a98::t_7a506df3ef337c 7,16,42-46,67,76-77,90-93,101-116,175-176,179-180,244,265,276,291,312,321,411,415,435
+packages/react-ui/src/components/Charts/interactiveLegend.test.tsx
+  s_56e1e756863a98::t_c9781ea6359b34 1-124
+  s_56e1e756863a98::t_5b61ff0143acd8 125-160
+packages/react-ui/src/components/Charts/AreaChart/AreaChart.test.tsx
+  s_56e1e756863a98::t_ce99780f3dc9c2 1-70
+packages/react-ui/src/components/Charts/BarChart/BarChart.test.tsx
+  s_56e1e756863a98::t_b21d9fc5078298 1-138
+packages/react-ui/src/components/Charts/AreaChart/stories/InteractiveLegend.stories.tsx
+  s_56e1e756863a98::t_15073baca9cdd8 1-55
+packages/react-ui/src/test/setup.ts
+  s_56e1e756863a98::t_4e38026c1c2a9b 18-30
+packages/react-ui/src/components/Charts/BarChart/stories/InteractiveLegend.stories.tsx
+  s_56e1e756863a98::t_873caefa959dc0 1-89
+packages/react-ui/src/components/Charts/hooks/useInteractiveLegend.test.ts
+  s_56e1e756863a98::t_7068cee497868e 1-87,93-96
+  s_56e1e756863a98::t_d7617a7edccf22 88-92
+packages/react-ui/src/components/Charts/LineChart/stories/InteractiveLegend.stories.tsx
+  s_56e1e756863a98::t_f216e046e94f4b 1-61
+packages/react-ui/src/components/Charts/LineChart/LineChart.tsx
+  s_56e1e756863a98::t_4a215dfee756c3 412
+  s_56e1e756863a98::t_548783bc15aff6 9,25,34,74-78,113,150-181,183,379-381,383,406,448,472,562,609
+packages/react-ui/src/components/Charts/utils/BarCharts/BarChartsUtils.test.ts
+  s_56e1e756863a98::t_309245779769ee 1-57
+packages/react-ui/src/components/Charts/hooks/index.ts
+  s_56e1e756863a98::t_779d692e4baf64 4
+packages/react-ui/src/components/Charts/hooks/useInteractiveLegend.ts
+  s_56e1e756863a98::t_fc05ba33ca7e4a 1-92
+packages/react-ui/src/components/Charts/BarChart/BarChart.tsx
+  s_56e1e756863a98::t_9397515bc7ae0a 36
+  s_56e1e756863a98::t_df5b03f087a2a3 84-88
+  s_56e1e756863a98::t_7449189994b69d 468
+  s_56e1e756863a98::t_51b11186ee00e0 10
+  s_56e1e756863a98::t_eb628063a6f22f 723
+  s_56e1e756863a98::t_3226ea969e2706 449
+  s_56e1e756863a98::t_6b819d2f06187c 383-385,387
+  s_56e1e756863a98::t_147d85b1ae6351 126
+  s_56e1e756863a98::t_1fef747b6c83d8 406,412
+  s_56e1e756863a98::t_7b6e07e1f2bc71 560-561,563
+  s_56e1e756863a98::t_d93c0008034eb2 592
+  s_56e1e756863a98::t_cc9f60bba53391 539
+  s_56e1e756863a98::t_682622e5a3ee42 168-169,177-201
+  s_56e1e756863a98::t_a9ddccfff8dafd 202
+packages/react-ui/src/components/Charts/LineChart/LineChart.test.tsx
+  s_56e1e756863a98::t_21ebb784f886cc 1-79
+packages/react-ui/src/components/Charts/AreaChart/AreaChart.tsx
+  s_56e1e756863a98::t_ee83267d14ddca 9,25,34,63-67,92,103-121,312-314,334,340,434,475
+packages/react-ui/src/components/Charts/AreaChartCondensed/AreaChartCondensed.tsx
+  s_56e1e756863a98::t_7f9be1f164de36 12,29,54-58,81,92-110,261-263,282,371,404
+packages/react-ui/src/components/Charts/BarChartCondensed/BarChartCondensed.tsx
+  s_56e1e756863a98::t_84bed42fc5298d 13,30,58-62,95,104-122,247,254-261,354-356,375,385,402-404,433,537
+packages/react-ui/src/components/Charts/HorizontalBarChart/HorizontalBarChart.tsx
+  s_56e1e756863a98::t_974d1b17d762c0 8,28,62-66,91,126-127,135-141,301-303,319,429,445-446,452,508
+packages/react-ui/src/components/Charts/LineChartCondensed/LineChartCondensed.tsx
+  s_56e1e756863a98::t_ed831f9bee15c7 11,29,55-59,83,94-112,264-266,285,355,385
+packages/react-ui/src/components/Charts/RadarChart/RadarChart.tsx
+  s_56e1e756863a98::t_18fc120cf5309a 13,16,37-41,58,69-70,78-84,146,177,264
+packages/react-ui/src/test/legendInteraction.ts
+  s_56e1e756863a98::t_2abb0dac98e389 1-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "c038127b13748ac1ed52b97d294010ce171393aa",
+  "prompts": {},
+  "sessions": {
+    "s_56e1e756863a98": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "df01a7db-f665-4ab7-9afa-adbddbf9c475",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Venkateshwaran Selvaraj <venkateshwaran.s@sarasanalytics.com>"
+    }
+  }
+}
