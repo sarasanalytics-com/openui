@@ -21,7 +21,10 @@ export interface UseInteractiveLegendArgs {
   colors: string[];
   /** Optional per-series legend icons. */
   icons?: Partial<Record<string, React.ComponentType>>;
-  /** When false the legend stays static and every series stays visible. */
+  /**
+   * When false the legend stays static and every series stays visible. Any
+   * hidden state is dropped, so switching interaction back on starts clean.
+   */
   enabled?: boolean;
   /** Notified after a legend interaction changed which series are visible. */
   onVisibilityChange?: (change: SeriesVisibilityChange) => void;
@@ -67,6 +70,7 @@ export const useInteractiveLegend = ({
   const { hiddenKeys, visibleKeys, toggle, isolate } = useSeriesVisibility(
     dataKeys,
     onVisibilityChange,
+    { enabled },
   );
 
   const effectiveHiddenKeys = enabled ? hiddenKeys : EMPTY_HIDDEN_KEYS;

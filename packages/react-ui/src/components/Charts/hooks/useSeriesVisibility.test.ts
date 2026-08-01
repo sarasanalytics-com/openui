@@ -255,6 +255,26 @@ describe("useSeriesVisibility onChange", () => {
     });
   });
 
+  it("clears hidden state when enabled flips, without reporting it", () => {
+    const onChange = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useSeriesVisibility(KEYS, onChange, { enabled }),
+      { initialProps: { enabled: true } },
+    );
+
+    act(() => result.current.toggle("revenue"));
+    onChange.mockClear();
+
+    rerender({ enabled: false });
+    expect(result.current.hiddenKeys.size).toBe(0);
+
+    rerender({ enabled: true });
+    expect(result.current.hiddenKeys.size).toBe(0);
+    expect(result.current.visibleKeys).toEqual(KEYS);
+    // Render-phase resets are silent by design.
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("works without an onChange", () => {
     const { result } = renderHook(() => useSeriesVisibility(KEYS));
 

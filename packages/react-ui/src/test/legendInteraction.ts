@@ -8,12 +8,35 @@ import { fireEvent, screen } from "@testing-library/react";
  * probe.
  */
 
-/** Every interactive legend item, in series order. */
-export const getLegendItems = (): HTMLElement[] => screen.queryAllByRole("button");
+/**
+ * Every interactive legend item, in series order.
+ *
+ * Scoped to elements that carry `aria-pressed`: legends also render buttons of
+ * their own (show more/less, scroll), which are not legend items.
+ */
+export const getLegendItems = (): HTMLElement[] =>
+  screen.queryAllByRole("button").filter((item) => item.getAttribute("aria-pressed") !== null);
 
-/** The interactive legend item for a series, matched on its accessible label. */
-export const getLegendItem = (label: string): HTMLElement =>
-  screen.getByRole("button", { name: `${label}; press Enter to toggle series` });
+/**
+ * The interactive legend item for a series, matched on its accessible name.
+ *
+ * Legend rows carry no `aria-label`, so the accessible name is the row's own
+ * text — the label, plus a percentage on the stacked legend. Hence the prefix
+ * match rather than an exact one.
+ */
+export const getLegendItem = (label: string): HTMLElement => {
+  const matches = getLegendItems().filter((item) => {
+    const text = (item.textContent ?? "").trim();
+    return text === label || text.startsWith(label);
+  });
+  if (matches.length !== 1) {
+    throw new Error(
+      `Expected exactly one legend item for "${label}", found ${matches.length}.` +
+        ` Use getLegendItems() when labels repeat.`,
+    );
+  }
+  return matches[0]!;
+};
 
 /**
  * The palette color rendered on each legend swatch, in series order.

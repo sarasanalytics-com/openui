@@ -15,7 +15,10 @@ export interface CategoryLegendInteractionProps {
 export interface UseCategoryVisibilityArgs {
   /** Every category/slice/segment of the chart, in palette order. Never filtered. */
   keys: string[];
-  /** When false the legend stays static and every category stays visible. */
+  /**
+   * When false the legend stays static and every category stays visible. Any
+   * hidden state is dropped, so switching interaction back on starts clean.
+   */
   enabled?: boolean;
   /** Notified after a legend interaction changed which categories are visible. */
   onVisibilityChange?: (change: SeriesVisibilityChange) => void;
@@ -56,6 +59,7 @@ export const useCategoryVisibility = ({
   const { hiddenKeys, visibleKeys, toggle, isolate } = useSeriesVisibility(
     keys,
     onVisibilityChange,
+    { enabled },
   );
 
   const legendInteractionProps: CategoryLegendInteractionProps = useMemo(() => {

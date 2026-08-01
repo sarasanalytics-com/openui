@@ -88,10 +88,29 @@ export const SingleStackedBar = <T extends SingleStackedBarData>({
 
   const segmentKeys = useMemo(() => segments.map((segment) => segment.key), [segments]);
 
+  // Visibility keys are index-disambiguated (`Chrome-0`) so duplicate category
+  // names toggle independently. That is an internal detail: the public callback
+  // must report the plain category names the consumer handed in.
+  const categoryBySegmentKey = useMemo(() => {
+    const map: Record<string, string> = {};
+    segments.forEach((segment) => {
+      map[segment.key] = segment.category;
+    });
+    return map;
+  }, [segments]);
+
   const { hiddenKeys, legendInteractionProps } = useCategoryVisibility({
     keys: segmentKeys,
     enabled: interactiveLegend,
-    onVisibilityChange: onSeriesVisibilityChange,
+    // Inline arrow is fine: the hook reads this through a ref.
+    onVisibilityChange: onSeriesVisibilityChange
+      ? (change) =>
+          onSeriesVisibilityChange({
+            ...change,
+            key: categoryBySegmentKey[change.key] ?? change.key,
+            visibleKeys: change.visibleKeys.map((key) => categoryBySegmentKey[key] ?? key),
+          })
+      : undefined,
   });
 
   // Get theme colors for each segment

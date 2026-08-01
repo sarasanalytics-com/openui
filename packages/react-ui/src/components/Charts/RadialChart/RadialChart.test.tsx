@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { stubChartLayout } from "../../../test/chartLayout";
 import {
@@ -113,15 +113,13 @@ describe("RadialChart interactive legend", () => {
     fireEvent.click(getLegendItem("Paid"));
 
     expect(countSlices(container, "radial-bar")).toBe(3);
-    expect(getLegendItem("Paid").style.opacity).toBe("0.3");
+    expect(getLegendItem("Paid").getAttribute("data-hidden")).toBe("true");
   });
 
   it("keeps the legend static when interactiveLegend is false", () => {
     const { container } = renderChart({ interactiveLegend: false });
 
-    expect(screen.queryAllByRole("button", { name: /press Enter to toggle series/ })).toHaveLength(
-      0,
-    );
+    expect(getLegendItems()).toHaveLength(0);
 
     const row = container.querySelectorAll(".openui-stacked-legend__item")[1] as HTMLElement;
     fireEvent.click(row);

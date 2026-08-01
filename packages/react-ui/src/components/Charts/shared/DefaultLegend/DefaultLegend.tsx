@@ -27,8 +27,6 @@ interface DefaultLegendProps {
   onItemDoubleClick?: (key: string) => void;
 }
 
-const HIDDEN_ITEM_OPACITY = 0.3;
-
 const DefaultLegend = memo(
   React.forwardRef<HTMLDivElement, DefaultLegendProps>(
     (
@@ -106,29 +104,30 @@ const DefaultLegend = memo(
           >
             {displayItems.map((item) => {
               const isItemHidden = item.hidden === true;
-              const itemStyle: React.CSSProperties | undefined =
-                isItemHidden || onItemClick
-                  ? {
-                      ...(isItemHidden ? { opacity: HIDDEN_ITEM_OPACITY } : {}),
-                      ...(onItemClick ? { cursor: "pointer" } : {}),
-                    }
-                  : undefined;
 
+              // No `aria-label`: the row's own text (label + percentage) is the
+              // accessible name, so screen readers announce what is on screen.
+              // Dimming and the pointer cursor live in the stylesheet, keyed off
+              // these data attributes.
               const interactiveProps: React.HTMLAttributes<HTMLDivElement> = onItemClick
                 ? {
                     role: "button",
                     tabIndex: 0,
                     "aria-pressed": !isItemHidden,
-                    "aria-label": `${item.label}; press Enter to toggle series`,
                     onClick: () => onItemClick(item.key),
                     onDoubleClick: onItemDoubleClick
                       ? () => onItemDoubleClick(item.key)
                       : undefined,
                     onKeyDown: (event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        onItemClick(item.key);
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      // Isolate has no pointer-free equivalent otherwise: double
+                      // click is the only other way to reach it.
+                      if (event.shiftKey && onItemDoubleClick) {
+                        onItemDoubleClick(item.key);
+                        return;
                       }
+                      onItemClick(item.key);
                     },
                   }
                 : {};
@@ -137,7 +136,8 @@ const DefaultLegend = memo(
                 <div
                   key={item.key}
                   className="openui-chart-legend-item"
-                  style={itemStyle}
+                  data-interactive={onItemClick ? true : undefined}
+                  data-hidden={isItemHidden ? true : undefined}
                   {...interactiveProps}
                 >
                   {item.icon ? (

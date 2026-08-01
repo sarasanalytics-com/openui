@@ -110,7 +110,8 @@ const AreaChartCondensedComponent = <T extends AreaChartData>({
     dataKeys,
     colors,
     icons,
-    enabled: interactiveLegend,
+    // Nothing to interact with when the legend is not rendered at all.
+    enabled: interactiveLegend && legend,
     onVisibilityChange: onSeriesVisibilityChange,
   });
 
@@ -158,6 +159,8 @@ const AreaChartCondensedComponent = <T extends AreaChartData>({
 
   const id = useId();
 
+  // Export deliberately covers the FULL series list: it is the chart's data,
+  // not the current view, so hidden series must still be exported.
   const exportData = useExportChartData({
     type: "area",
     data,

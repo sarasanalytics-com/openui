@@ -11,7 +11,15 @@ module.exports = [
     ignores: ["**/src/templates/**", "**/.storybook/**"],
   },
   {
-    files: ["**/__tests__/**/*.{ts,tsx}", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    // `src/test/**` holds test-only helpers. They live outside the build
+    // tsconfig (which must not emit them into `dist`), so they are typed by the
+    // test tsconfig like the test files themselves.
+    files: [
+      "**/__tests__/**/*.{ts,tsx}",
+      "**/*.test.{ts,tsx}",
+      "**/*.spec.{ts,tsx}",
+      "**/src/test/**/*.{ts,tsx}",
+    ],
     languageOptions: {
       parser: typescript,
       parserOptions: {
@@ -27,6 +35,7 @@ module.exports = [
       "**/__tests__/**/*.{ts,tsx}",
       "**/*.test.{ts,tsx}",
       "**/*.spec.{ts,tsx}",
+      "**/src/test/**/*.{ts,tsx}",
       "*.config.ts",
     ],
     languageOptions: {

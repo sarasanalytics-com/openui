@@ -120,6 +120,10 @@ export const ScatterChart = ({
 
   // Domains are derived from the visible datasets only, so both axes rescale.
   const visibleData: ScatterChartData = useMemo(() => {
+    // Same guard as `transformedData` above: `data` is not trusted to be an array.
+    if (!data || !Array.isArray(data)) {
+      return [];
+    }
     if (hiddenKeys.size === 0) {
       return data;
     }

@@ -82,6 +82,25 @@ describe("useInteractiveLegend", () => {
     expect(result.current.hiddenKeys.size).toBe(0);
   });
 
+  it("clears the hidden state when interaction is switched off and back on", () => {
+    const { result, rerender } = renderHook(
+      (props: { enabled: boolean }) =>
+        useInteractiveLegend({ dataKeys, colors, enabled: props.enabled }),
+      { initialProps: { enabled: true } },
+    );
+
+    act(() => result.current.legendInteractionProps.onItemClick?.("revenue"));
+    expect(result.current.hiddenKeys.has("revenue")).toBe(true);
+
+    rerender({ enabled: false });
+    expect(result.current.hiddenKeys.size).toBe(0);
+
+    // Switching interaction back on must NOT resurrect the old selection.
+    rerender({ enabled: true });
+    expect(result.current.hiddenKeys.size).toBe(0);
+    expect(result.current.visibleKeys).toEqual(dataKeys);
+  });
+
   it("keeps its handlers and its disabled props referentially stable", () => {
     const { result, rerender } = renderHook(
       (props: { enabled: boolean }) =>

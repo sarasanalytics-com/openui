@@ -18,7 +18,7 @@ describe("DefaultLegend", () => {
     expect(screen.queryByRole("button")).toBeNull();
     const item = screen.getByText("Sales").closest(".openui-chart-legend-item");
     expect(item?.getAttribute("tabindex")).toBeNull();
-    expect(item?.getAttribute("style")).toBeNull();
+    expect(item?.getAttribute("data-interactive")).toBeNull();
   });
 
   it("renders an interactive item per series when onItemClick is provided", () => {
@@ -27,8 +27,11 @@ describe("DefaultLegend", () => {
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(items.length);
     expect(buttons[0]?.getAttribute("tabindex")).toBe("0");
-    expect(buttons[0]?.getAttribute("aria-label")).toBe("Sales; press Enter to toggle series");
-    expect(buttons[0]?.style.cursor).toBe("pointer");
+    // No aria-label: the row's own text is the accessible name.
+    expect(buttons[0]?.getAttribute("aria-label")).toBeNull();
+    expect(buttons[0]?.textContent).toBe("Sales");
+    // Pointer cursor is a stylesheet rule keyed off this attribute.
+    expect(buttons[0]?.getAttribute("data-interactive")).toBe("true");
   });
 
   it("fires onItemClick on click, Enter and Space", () => {
@@ -65,7 +68,7 @@ describe("DefaultLegend", () => {
     expect(onItemDoubleClick).toHaveBeenCalledWith("revenue");
   });
 
-  it("reflects hidden state via aria-pressed and dimmed opacity", () => {
+  it("reflects hidden state via aria-pressed and the dimming attribute", () => {
     renderLegend({
       items: [items[0]!, { ...items[1]!, hidden: true }],
       onItemClick: () => {},
@@ -74,16 +77,40 @@ describe("DefaultLegend", () => {
     const [visible, hidden] = screen.getAllByRole("button");
 
     expect(visible?.getAttribute("aria-pressed")).toBe("true");
-    expect(visible?.style.opacity).toBe("");
+    expect(visible?.getAttribute("data-hidden")).toBeNull();
 
     expect(hidden?.getAttribute("aria-pressed")).toBe("false");
-    expect(hidden?.style.opacity).toBe("0.3");
+    expect(hidden?.getAttribute("data-hidden")).toBe("true");
   });
 
-  it("dims hidden items even without interactivity", () => {
+  it("marks hidden items even without interactivity", () => {
     renderLegend({ items: [items[0]!, { ...items[1]!, hidden: true }] });
 
     const hidden = screen.getByText("Revenue").closest(".openui-chart-legend-item");
-    expect((hidden as HTMLElement).style.opacity).toBe("0.3");
+    expect(hidden?.getAttribute("data-hidden")).toBe("true");
+  });
+
+  it("isolates on Shift+Enter and Shift+Space", () => {
+    const onItemClick = vi.fn();
+    const onItemDoubleClick = vi.fn();
+    renderLegend({ onItemClick, onItemDoubleClick });
+
+    const salesItem = screen.getAllByRole("button")[0]!;
+
+    fireEvent.keyDown(salesItem, { key: "Enter", shiftKey: true });
+    fireEvent.keyDown(salesItem, { key: " ", shiftKey: true });
+
+    expect(onItemDoubleClick).toHaveBeenCalledTimes(2);
+    expect(onItemDoubleClick).toHaveBeenNthCalledWith(1, "sales");
+    expect(onItemClick).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a plain toggle on Shift+Enter when isolate is not wired", () => {
+    const onItemClick = vi.fn();
+    renderLegend({ onItemClick });
+
+    fireEvent.keyDown(screen.getAllByRole("button")[0]!, { key: "Enter", shiftKey: true });
+
+    expect(onItemClick).toHaveBeenCalledWith("sales");
   });
 });

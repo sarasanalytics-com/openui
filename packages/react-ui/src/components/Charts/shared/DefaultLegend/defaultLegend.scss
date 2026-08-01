@@ -51,6 +51,21 @@
     align-items: center;
     gap: cssUtils.$space-xs;
 
+    // Set by DefaultLegend when the chart wires up legend interaction.
+    &[data-interactive="true"] {
+      cursor: pointer;
+
+      &:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 2px;
+      }
+    }
+
+    // A hidden series stays in the legend, dimmed, so it can be brought back.
+    &[data-hidden="true"] {
+      opacity: 0.3;
+    }
+
     svg {
       height: 10px;
       width: 10px;

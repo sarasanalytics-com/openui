@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { fireEvent, render } from "@testing-library/react";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { stubChartLayout } from "../../../test/chartLayout";
 import {
   countSlices,
@@ -136,15 +136,51 @@ describe("PieChart interactive legend", () => {
 
     expect(countSlices(container, "pie")).toBe(3);
     expect(getLegendColors(container)).toEqual(colorsBefore);
-    expect(getLegendItem("Paid").style.opacity).toBe("0.3");
+    expect(getLegendItem("Paid").getAttribute("data-hidden")).toBe("true");
+  });
+
+  it("reports plain category names to onSeriesVisibilityChange", () => {
+    const onSeriesVisibilityChange = vi.fn();
+    renderChart({ onSeriesVisibilityChange });
+
+    fireEvent.click(getLegendItem("Paid"));
+
+    // Never the internal `Paid-1` row key.
+    expect(onSeriesVisibilityChange).toHaveBeenCalledWith({
+      key: "Paid",
+      action: "hide",
+      visibleKeys: ["Organic", "Referral", "Email"],
+    });
+  });
+
+  it("toggles duplicate-named slices independently", () => {
+    const { container } = renderChart({
+      data: [
+        { channel: "Other", visits: 40 },
+        { channel: "Other", visits: 30 },
+        { channel: "Direct", visits: 20 },
+      ],
+    });
+
+    expect(countSlices(container, "pie")).toBe(3);
+
+    const [firstOther, secondOther] = getLegendItems();
+    fireEvent.click(firstOther!);
+
+    // Only the row that was clicked goes away.
+    expect(countSlices(container, "pie")).toBe(2);
+    expect(firstOther!.getAttribute("aria-pressed")).toBe("false");
+    expect(secondOther!.getAttribute("aria-pressed")).toBe("true");
+
+    // ...and the two same-named rows keep distinct colors.
+    const colors = getStackedLegendColors(container);
+    expect(colors[0]).not.toBe(colors[1]);
   });
 
   it("keeps the legend static when interactiveLegend is false", () => {
     const { container } = renderChart({ interactiveLegend: false });
 
-    expect(screen.queryAllByRole("button", { name: /press Enter to toggle series/ })).toHaveLength(
-      0,
-    );
+    expect(getLegendItems()).toHaveLength(0);
 
     const row = container.querySelectorAll(".openui-stacked-legend__item")[1] as HTMLElement;
     fireEvent.click(row);

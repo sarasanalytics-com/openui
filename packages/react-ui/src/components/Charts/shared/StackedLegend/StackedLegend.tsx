@@ -38,8 +38,6 @@ const formatPercentage = (value: number, total: number): string => {
   return `${percentage.toFixed(1)}%`;
 };
 
-const HIDDEN_ITEM_OPACITY = 0.3;
-
 const ITEM_HEIGHT = 36; // Height of each legend item
 const ITEM_GAP = 2; // Gap between items
 const LEGEND_ITEM_LIMIT = 6;
@@ -196,23 +194,27 @@ export const StackedLegend = ({
       <div ref={listRef} className="openui-stacked-legend">
         {itemsToDisplay.map((item, index) => {
           const isItemHidden = item.hidden === true;
-          const itemStyle: React.CSSProperties | undefined = isItemHidden
-            ? { opacity: HIDDEN_ITEM_OPACITY }
-            : undefined;
 
+          // No `aria-label`: the row's own text (label + percentage) is the
+          // accessible name, so screen readers announce what is on screen.
+          // Dimming lives in the stylesheet, keyed off `data-hidden`.
           const interactiveProps: React.HTMLAttributes<HTMLDivElement> = onItemClick
             ? {
                 role: "button",
                 tabIndex: 0,
                 "aria-pressed": !isItemHidden,
-                "aria-label": `${item.label}; press Enter to toggle series`,
                 onClick: () => onItemClick(item.key),
                 onDoubleClick: onItemDoubleClick ? () => onItemDoubleClick(item.key) : undefined,
                 onKeyDown: (event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onItemClick(item.key);
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  // Isolate has no pointer-free equivalent otherwise: double
+                  // click is the only other way to reach it.
+                  if (event.shiftKey && onItemDoubleClick) {
+                    onItemDoubleClick(item.key);
+                    return;
                   }
+                  onItemClick(item.key);
                 },
               }
             : {};
@@ -225,7 +227,8 @@ export const StackedLegend = ({
                     ? "openui-stacked-legend__item--active"
                     : ""
                 }`}
-                style={itemStyle}
+                data-interactive={onItemClick ? true : undefined}
+                data-hidden={isItemHidden ? true : undefined}
                 onMouseEnter={() => handleMouseEnter(item.key, index, isItemHidden)}
                 onMouseLeave={handleMouseLeave}
                 {...interactiveProps}

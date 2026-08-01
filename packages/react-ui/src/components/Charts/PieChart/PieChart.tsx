@@ -119,6 +119,14 @@ const PieChartComponent = <T extends PieChartData>({
   );
   const transformedKeys = useTransformedKeys(categories);
 
+  // Visibility is tracked per legend ROW, not per category name: two slices can
+  // legitimately carry the same label, and they must toggle (and stay colored)
+  // independently. Keys are index-disambiguated over the sorted render order.
+  const rowKeys = useMemo(
+    () => categories.map((category, index) => `${category}-${index}`),
+    [categories],
+  );
+
   // Memoize string conversions to avoid repeated calls
   const categoryKeyString = useMemo(() => String(categoryKey), [categoryKey]);
   const dataKeyString = useMemo(() => String(dataKey), [dataKey]);
@@ -177,27 +185,41 @@ const PieChartComponent = <T extends PieChartData>({
   });
 
   const { hiddenKeys, legendInteractionProps } = useCategoryVisibility({
-    keys: categories,
+    keys: rowKeys,
     enabled: interactiveLegend,
-    onVisibilityChange: onSeriesVisibilityChange,
+    // Row keys are an internal detail; the public callback reports the plain
+    // category names. Inline arrow is fine: the hook reads this through a ref.
+    onVisibilityChange: onSeriesVisibilityChange
+      ? (change) => {
+          const categoryByRowKey = new Map(rowKeys.map((key, index) => [key, categories[index]!]));
+          onSeriesVisibilityChange({
+            ...change,
+            key: categoryByRowKey.get(change.key) ?? change.key,
+            visibleKeys: change.visibleKeys.map((key) => categoryByRowKey.get(key) ?? key),
+          });
+        }
+      : undefined,
   });
 
-  // Category -> color over the FULL list, so the survivors keep their color when
-  // a slice is hidden and the rendered data shrinks.
-  const colorByCategory = useMemo(() => {
-    const map: Record<string, string> = {};
-    categories.forEach((category, index) => {
-      map[category] = colors[index] || "#000000";
+  // Indexes (into the sorted list) of the rows that are actually drawn.
+  const visibleRowIndexes = useMemo(() => {
+    const indexes: number[] = [];
+    rowKeys.forEach((key, index) => {
+      if (!hiddenKeys.has(key)) indexes.push(index);
     });
-    return map;
-  }, [categories, colors]);
+    return indexes;
+  }, [rowKeys, hiddenKeys]);
 
   const visibleData = useMemo(
-    () =>
-      hiddenKeys.size === 0
-        ? sortedProcessedData
-        : sortedProcessedData.filter((item) => !hiddenKeys.has(String(item[categoryKey]))),
-    [sortedProcessedData, categoryKey, hiddenKeys],
+    () => visibleRowIndexes.map((index) => sortedProcessedData[index]!),
+    [sortedProcessedData, visibleRowIndexes],
+  );
+
+  // Colors are positional over the FULL row list, so hiding a slice never
+  // recolors the survivors and duplicate names keep their own color.
+  const visibleColors = useMemo(
+    () => visibleRowIndexes.map((index) => colors[index] || "#000000"),
+    [visibleRowIndexes, colors],
   );
 
   const exportData = useExportChartData({
@@ -255,16 +277,16 @@ const PieChartComponent = <T extends PieChartData>({
   const legendItems = useMemo(
     () =>
       sortedProcessedData.map((item, index) => {
-        const key = String(item[categoryKey]);
+        const rowKey = rowKeys[index]!;
         return {
-          key,
-          label: key,
+          key: rowKey,
+          label: String(item[categoryKey]),
           value: Number(item[dataKey]),
           color: colors[index] || "#000000",
-          hidden: hiddenKeys.has(key),
+          hidden: hiddenKeys.has(rowKey),
         };
       }),
-    [sortedProcessedData, categoryKey, dataKey, colors, hiddenKeys],
+    [sortedProcessedData, categoryKey, dataKey, colors, hiddenKeys, rowKeys],
   );
 
   const defaultLegendItems = useMemo((): LegendItem[] => {
@@ -275,13 +297,11 @@ const PieChartComponent = <T extends PieChartData>({
     (index: number | null) => {
       if (legendVariant !== "stacked") return;
       if (index !== null) {
-        const item = sortedProcessedData[index];
-        if (item) {
-          const categoryValue = String(item[categoryKey]);
-          setHoveredLegendKey(categoryValue);
-          const transformedIndex = transformedData.findIndex(
-            (d) => String((d as any)[categoryKey]) === categoryValue,
-          );
+        const rowKey = rowKeys[index];
+        if (rowKey !== undefined) {
+          setHoveredLegendKey(rowKey);
+          // Matched by row, not by name: two slices can share a label.
+          const transformedIndex = visibleRowIndexes.indexOf(index);
           if (transformedIndex !== -1) {
             handleMouseEnter(transformedData[transformedIndex], transformedIndex);
           }
@@ -292,8 +312,8 @@ const PieChartComponent = <T extends PieChartData>({
       }
     },
     [
-      sortedProcessedData,
-      categoryKey,
+      rowKeys,
+      visibleRowIndexes,
       transformedData,
       handleMouseEnter,
       handleMouseLeave,
@@ -305,11 +325,21 @@ const PieChartComponent = <T extends PieChartData>({
     (entry: any, index: number) => {
       handleMouseEnter(entry, index);
       if (legend && legendVariant === "stacked") {
-        setHoveredLegendKey(String(entry[categoryKey]));
+        // `index` is the position in the RENDERED data, so it has to be mapped
+        // back onto the legend row it came from.
+        const rowIndex = visibleRowIndexes[index];
+        setHoveredLegendKey(rowIndex === undefined ? null : (rowKeys[rowIndex] ?? null));
       }
       eventHandlers.onMouseEnter?.(entry, index);
     },
-    [handleMouseEnter, categoryKey, legend, legendVariant, eventHandlers.onMouseEnter],
+    [
+      handleMouseEnter,
+      legend,
+      legendVariant,
+      eventHandlers.onMouseEnter,
+      rowKeys,
+      visibleRowIndexes,
+    ],
   );
 
   const handleChartMouseLeave = useCallback(() => {
@@ -397,14 +427,12 @@ const PieChartComponent = <T extends PieChartData>({
           innerRadius={dimensions.innerRadius}
           outerRadius={dimensions.middleRadius}
         >
-          {transformedData.map((entry, index: number) => {
-            const categoryValue = String(entry[categoryKey as keyof typeof entry] || "");
-            const transformedKey = transformedKeys[categoryValue] ?? categoryValue;
-            const config = chartConfig[transformedKey];
+          {transformedData.map((_entry, index: number) => {
             const hoverStyles = getHoverStyles(index, activeIndex);
-            // Keyed on the category, never on the rendered index: hiding a slice
-            // must not recolor the survivors.
-            const fill = config?.color || colorByCategory[categoryValue];
+            // Keyed on the ROW the slice came from, never on the rendered index
+            // alone: hiding a slice must not recolor the survivors, and two
+            // slices sharing a label must keep distinct colors.
+            const fill = visibleColors[index];
             return (
               <Cell
                 key={`inner-cell-${index}`}
@@ -422,14 +450,12 @@ const PieChartComponent = <T extends PieChartData>({
           innerRadius={dimensions.middleRadius}
           outerRadius={dimensions.outerRadius}
         >
-          {transformedData.map((entry, index: number) => {
-            const categoryValue = String(entry[categoryKey as keyof typeof entry] || "");
-            const transformedKey = transformedKeys[categoryValue] ?? categoryValue;
-            const config = chartConfig[transformedKey];
+          {transformedData.map((_entry, index: number) => {
             const hoverStyles = getHoverStyles(index, activeIndex);
-            // Keyed on the category, never on the rendered index: hiding a slice
-            // must not recolor the survivors.
-            const fill = config?.color || colorByCategory[categoryValue];
+            // Keyed on the ROW the slice came from, never on the rendered index
+            // alone: hiding a slice must not recolor the survivors, and two
+            // slices sharing a label must keep distinct colors.
+            const fill = visibleColors[index];
             return <Cell key={`outer-cell-${index}`} fill={fill} {...hoverStyles} stroke="none" />;
           })}
         </Pie>,
@@ -442,29 +468,17 @@ const PieChartComponent = <T extends PieChartData>({
         innerRadius={dimensions.innerRadius}
         activeIndex={activeIndex ?? undefined}
       >
-        {transformedData.map((entry, index: number) => {
-          const categoryValue = String(entry[categoryKey as keyof typeof entry] || "");
-          const transformedKey = transformedKeys[categoryValue] ?? categoryValue;
-          const config = chartConfig[transformedKey];
+        {transformedData.map((_entry, index: number) => {
           const hoverStyles = getHoverStyles(index, activeIndex);
-          // Keyed on the category, never on the rendered index: hiding a slice
-          // must not recolor the survivors.
-          const fill = config?.color || colorByCategory[categoryValue];
+          // Keyed on the ROW the slice came from, never on the rendered index
+          // alone: hiding a slice must not recolor the survivors, and two
+          // slices sharing a label must keep distinct colors.
+          const fill = visibleColors[index];
           return <Cell key={`cell-${index}`} fill={fill} {...hoverStyles} stroke="none" />;
         })}
       </Pie>
     );
-  }, [
-    variant,
-    commonPieProps,
-    dimensions,
-    transformedData,
-    categoryKey,
-    chartConfig,
-    activeIndex,
-    colorByCategory,
-    transformedKeys,
-  ]);
+  }, [variant, commonPieProps, dimensions, transformedData, activeIndex, visibleColors]);
 
   const renderLegend = useCallback(() => {
     if (!legend) return null;

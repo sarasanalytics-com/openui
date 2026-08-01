@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { fireEvent, render } from "@testing-library/react";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { stubChartLayout } from "../../../test/chartLayout";
 import {
   doubleClickLegendItem,
@@ -106,13 +106,13 @@ describe("SingleStackedBar interactive legend", () => {
     expect(container.querySelectorAll(SEGMENT_SELECTOR)).toHaveLength(1);
   });
 
-  it("dims the hidden legend item and reports it as unpressed", () => {
+  it("marks the hidden legend item and reports it as unpressed", () => {
     renderChart();
 
     fireEvent.click(getLegendItem("Interest"));
 
     expect(getLegendItem("Interest").getAttribute("aria-pressed")).toBe("false");
-    expect(getLegendItem("Interest").style.opacity).toBe("0.3");
+    expect(getLegendItem("Interest").getAttribute("data-hidden")).toBe("true");
   });
 
   it("drives the same visibility state from the stacked legend variant", () => {
@@ -129,17 +129,46 @@ describe("SingleStackedBar interactive legend", () => {
     expect(interest).toBe(30);
   });
 
+  it("reports plain category names to onSeriesVisibilityChange", () => {
+    const onSeriesVisibilityChange = vi.fn();
+    renderChart({ onSeriesVisibilityChange });
+
+    fireEvent.click(getLegendItem("Interest"));
+
+    // Never the internal `Interest-1` segment key.
+    expect(onSeriesVisibilityChange).toHaveBeenCalledWith({
+      key: "Interest",
+      action: "hide",
+      visibleKeys: ["Awareness", "Decision", "Action"],
+    });
+  });
+
+  it("toggles duplicate-named segments independently", () => {
+    const { container } = renderChart({
+      data: [
+        { stage: "Other", users: 40 },
+        { stage: "Other", users: 30 },
+        { stage: "Rest", users: 30 },
+      ],
+    });
+
+    const [firstOther, secondOther] = getLegendItems();
+    fireEvent.click(firstOther!);
+
+    expect(container.querySelectorAll(SEGMENT_SELECTOR)).toHaveLength(2);
+    expect(firstOther!.getAttribute("aria-pressed")).toBe("false");
+    expect(secondOther!.getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("keeps the legend static when interactiveLegend is false", () => {
     const { container } = renderChart({ interactiveLegend: false });
 
-    expect(screen.queryAllByRole("button", { name: /press Enter to toggle series/ })).toHaveLength(
-      0,
-    );
+    expect(getLegendItems()).toHaveLength(0);
 
     const item = container.querySelectorAll(".openui-chart-legend-item")[1] as HTMLElement;
     fireEvent.click(item);
 
     expect(getSegmentWidths(container)).toEqual([40, 30, 20, 10]);
-    expect(item.style.opacity).toBe("");
+    expect(item.getAttribute("data-hidden")).toBeNull();
   });
 });

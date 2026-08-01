@@ -20,9 +20,17 @@ export type SeriesVisibilityChange = {
   visibleKeys: string[];
 };
 
+export interface UseSeriesVisibilityOptions {
+  /**
+   * When false the hidden state is cleared. Flipping it back on therefore starts
+   * from "everything visible" instead of resurrecting a stale selection.
+   */
+  enabled?: boolean;
+}
+
 export interface UseSeriesVisibilityResult {
   /** Keys of the series that are currently hidden. */
-  hiddenKeys: Set<string>;
+  hiddenKeys: ReadonlySet<string>;
   /** Data keys that are still visible, in their original order. */
   visibleKeys: string[];
   /** Hide/show a single series. No-op when it would hide the last visible series. */
@@ -40,7 +48,15 @@ export interface UseSeriesVisibilityResult {
  * guard so a chart can never end up empty.
  *
  * Hidden state resets whenever the set of data keys changes (compared by content,
- * not by array identity, so ordinary re-renders keep the user's selection).
+ * not by array identity, so ordinary re-renders keep the user's selection), and
+ * whenever `enabled` flips.
+ *
+ * IMPORTANT — resets are silent. They clear the hidden keys during render and do
+ * NOT fire `onChange` (a listener must never be called from render). Consumers
+ * that mirror visibility elsewhere (analytics, a controlled prop, a stored
+ * selection) have to re-derive it themselves when the data changes, rather than
+ * assume `onChange` reports every transition. The key signature is also
+ * order-sensitive: re-ordering the same series resets the selection too.
  *
  * All returned callbacks are stable across re-renders so memoized consumers such
  * as `DefaultLegend` do not re-render needlessly. `onChange` is read through a
@@ -49,20 +65,32 @@ export interface UseSeriesVisibilityResult {
  * @param dataKeys Every series of the chart, in its original order.
  * @param onChange Notified after a change is applied. See
  *   {@link SeriesVisibilityChange} for what is and is not reported.
+ * @param options See {@link UseSeriesVisibilityOptions}.
  */
 export const useSeriesVisibility = (
   dataKeys: string[],
   onChange?: (change: SeriesVisibilityChange) => void,
+  { enabled = true }: UseSeriesVisibilityOptions = {},
 ): UseSeriesVisibilityResult => {
   const keysSignature = dataKeys.join("\u0000");
 
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => new Set<string>());
   const [prevSignature, setPrevSignature] = useState(keysSignature);
+  const [prevEnabled, setPrevEnabled] = useState(enabled);
 
   // Reset during render (instead of in an effect) so consumers never see a frame
   // with stale hidden keys after the series change.
   if (prevSignature !== keysSignature) {
     setPrevSignature(keysSignature);
+    if (hiddenKeys.size > 0) {
+      setHiddenKeys(new Set<string>());
+    }
+  }
+
+  // Turning interaction off must actually drop the selection: masking it would
+  // resurrect series the user hid when interaction is switched back on.
+  if (prevEnabled !== enabled) {
+    setPrevEnabled(enabled);
     if (hiddenKeys.size > 0) {
       setHiddenKeys(new Set<string>());
     }

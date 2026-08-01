@@ -1,5 +1,6 @@
 import { fireEvent, render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { stubChartLayout } from "../../test/chartLayout";
 import {
   countSeries,
   getLegendColors,
@@ -41,8 +42,24 @@ describe("BarChartCondensed interactive legend", () => {
     expect(getLegendColors(container)).toEqual(colorsBefore);
   });
 
+  it("isolates a series from the keyboard with Shift+Enter", () => {
+    const { container } = render(<BarChartCondensed {...shared} />);
+
+    fireEvent.keyDown(getLegendItem("sales"), { key: "Enter", shiftKey: true });
+
+    // Only sales is left, in the main chart and in the shadow Y-axis chart.
+    expect(countSeries(container, "bar")).toBe(2);
+    expect(getLegendItem("revenue").getAttribute("aria-pressed")).toBe("false");
+    expect(getLegendItem("sales").getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("keeps the legend static when interactiveLegend is false", () => {
     render(<BarChartCondensed {...shared} interactiveLegend={false} />);
+    expect(getLegendItems()).toHaveLength(0);
+  });
+
+  it("keeps the legend static when the legend itself is off", () => {
+    render(<BarChartCondensed {...shared} legend={false} />);
     expect(getLegendItems()).toHaveLength(0);
   });
 });
@@ -69,15 +86,25 @@ describe("AreaChartCondensed interactive legend", () => {
 });
 
 // HorizontalBarChart and RadarChart size themselves from an observed container,
-// which jsdom reports as 0x0, so Recharts draws no series at all. The legend
-// wiring is still asserted end-to-end through the chart's own state.
+// which jsdom reports as 0x0. `stubChartLayout` hands them a real box so the
+// rendered series can be counted like every other chart here.
 describe("HorizontalBarChart interactive legend", () => {
-  it("marks a series hidden and keeps the palette positional", () => {
+  let restoreLayout = () => {};
+  beforeAll(() => {
+    restoreLayout = stubChartLayout();
+  });
+  afterAll(() => restoreLayout());
+
+  it("hides a series and keeps the palette positional", () => {
     const { container } = render(<HorizontalBarChart {...shared} />);
 
     const colorsBefore = getLegendColors(container);
+    // 3 in the main chart + 3 in the shadow axis chart.
+    expect(countSeries(container, "bar")).toBe(6);
+
     fireEvent.click(getLegendItem("revenue"));
 
+    expect(countSeries(container, "bar")).toBe(4);
     expect(getLegendItem("revenue").getAttribute("aria-pressed")).toBe("false");
     expect(getLegendItem("sales").getAttribute("aria-pressed")).toBe("true");
     expect(getLegendColors(container)).toEqual(colorsBefore);
@@ -90,13 +117,23 @@ describe("HorizontalBarChart interactive legend", () => {
 });
 
 describe("RadarChart interactive legend", () => {
-  it("marks a series hidden and restores it", () => {
-    render(<RadarChart {...shared} />);
+  let restoreLayout = () => {};
+  beforeAll(() => {
+    restoreLayout = stubChartLayout();
+  });
+  afterAll(() => restoreLayout());
+
+  it("hides a series and restores it", () => {
+    const { container } = render(<RadarChart {...shared} />);
+
+    expect(countSeries(container, "radar")).toBe(3);
 
     fireEvent.click(getLegendItem("revenue"));
+    expect(countSeries(container, "radar")).toBe(2);
     expect(getLegendItem("revenue").getAttribute("aria-pressed")).toBe("false");
 
     fireEvent.click(getLegendItem("revenue"));
+    expect(countSeries(container, "radar")).toBe(3);
     expect(getLegendItem("revenue").getAttribute("aria-pressed")).toBe("true");
   });
 

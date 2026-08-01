@@ -321,6 +321,8 @@ export const LineChart = <T extends LineChartData>({
     };
   }, [updateScrollState]);
 
+  // Export deliberately covers the FULL series list: it is the chart's data,
+  // not the current view, so hidden series must still be exported.
   const exportData = useExportChartData({
     type: "line",
     data,

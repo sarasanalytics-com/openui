@@ -78,6 +78,17 @@
       background-color: cssUtils.$sunk;
     }
 
+    // Set by StackedLegend when the chart wires up legend interaction.
+    &[data-interactive="true"]:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 2px;
+    }
+
+    // A hidden row stays in the legend, dimmed, so it can be brought back.
+    &[data-hidden="true"] {
+      opacity: 0.3;
+    }
+
     &-label {
       display: flex;
       flex-direction: row;

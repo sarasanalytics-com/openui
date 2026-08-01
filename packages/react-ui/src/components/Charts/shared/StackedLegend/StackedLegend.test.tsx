@@ -17,9 +17,11 @@ const items: StackedLegendItem[] = [
 const renderLegend = (props: Partial<React.ComponentProps<typeof StackedLegend>> = {}) =>
   render(<StackedLegend items={items} layout="scrollable" {...props} />);
 
-/** The interactive row for an item, matched on its accessible label. */
-const getRow = (label: string) =>
-  screen.getByRole("button", { name: `${label}; press Enter to toggle series` });
+/**
+ * The interactive row for an item, matched on its accessible name — which is the
+ * row's own text (label + percentage), since the rows carry no `aria-label`.
+ */
+const getRow = (label: string) => screen.getByRole("button", { name: new RegExp(`^${label}\\b`) });
 
 describe("StackedLegend", () => {
   it("is not interactive without onItemClick", () => {
@@ -28,7 +30,7 @@ describe("StackedLegend", () => {
     expect(screen.queryByRole("button")).toBeNull();
     const [first] = getStackedLegendItems(container);
     expect(first?.getAttribute("tabindex")).toBeNull();
-    expect(first?.getAttribute("style")).toBeNull();
+    expect(first?.getAttribute("data-interactive")).toBeNull();
   });
 
   it("renders an interactive row per item when onItemClick is provided", () => {
@@ -37,7 +39,11 @@ describe("StackedLegend", () => {
     const rows = screen.getAllByRole("button");
     expect(rows).toHaveLength(items.length);
     expect(rows[0]?.getAttribute("tabindex")).toBe("0");
-    expect(rows[0]?.getAttribute("aria-label")).toBe("Sales; press Enter to toggle series");
+    // No aria-label: the row's own text (label + percentage) is the accessible
+    // name, so a screen reader announces what is actually on screen.
+    expect(rows[0]?.getAttribute("aria-label")).toBeNull();
+    expect(rows[0]?.textContent).toBe("Sales60.0%");
+    expect(rows[0]?.getAttribute("data-interactive")).toBe("true");
   });
 
   it("fires onItemClick on click, Enter and Space", () => {
@@ -74,25 +80,38 @@ describe("StackedLegend", () => {
     expect(onItemDoubleClick).toHaveBeenCalledWith("revenue");
   });
 
-  it("reflects hidden state via aria-pressed and dimmed opacity", () => {
+  it("reflects hidden state via aria-pressed and the dimming attribute", () => {
     renderLegend({
       items: [items[0]!, { ...items[1]!, hidden: true }, items[2]!],
       onItemClick: () => {},
     });
 
     expect(getRow("Sales").getAttribute("aria-pressed")).toBe("true");
-    expect(getRow("Sales").style.opacity).toBe("");
+    expect(getRow("Sales").getAttribute("data-hidden")).toBeNull();
 
     expect(getRow("Revenue").getAttribute("aria-pressed")).toBe("false");
-    expect(getRow("Revenue").style.opacity).toBe("0.3");
+    expect(getRow("Revenue").getAttribute("data-hidden")).toBe("true");
   });
 
-  it("dims hidden items even without interactivity", () => {
+  it("marks hidden items even without interactivity", () => {
     const { container } = renderLegend({
       items: [items[0]!, { ...items[1]!, hidden: true }, items[2]!],
     });
 
-    expect(getStackedLegendItems(container)[1]?.style.opacity).toBe("0.3");
+    expect(getStackedLegendItems(container)[1]?.getAttribute("data-hidden")).toBe("true");
+  });
+
+  it("isolates on Shift+Enter and Shift+Space", () => {
+    const onItemClick = vi.fn();
+    const onItemDoubleClick = vi.fn();
+    renderLegend({ onItemClick, onItemDoubleClick });
+
+    fireEvent.keyDown(getRow("Sales"), { key: "Enter", shiftKey: true });
+    fireEvent.keyDown(getRow("Sales"), { key: " ", shiftKey: true });
+
+    expect(onItemDoubleClick).toHaveBeenCalledTimes(2);
+    expect(onItemDoubleClick).toHaveBeenNthCalledWith(1, "sales");
+    expect(onItemClick).not.toHaveBeenCalled();
   });
 
   it("re-sums the visible percentages to 100 and leaves hidden ones on the full total", () => {
