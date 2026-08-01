@@ -14,7 +14,20 @@ interface DefaultLegendProps {
   isExpanded: boolean;
   setIsExpanded: (isExpanded: boolean) => void;
   style?: React.CSSProperties;
+  /**
+   * When provided, every legend item becomes interactive (button role, keyboard
+   * activation, pointer cursor). Without it the legend stays a plain, static list.
+   */
+  onItemClick?: (key: string) => void;
+  /**
+   * Fired on double click. A double click also fires `onItemClick` twice, so the
+   * consumer is responsible for the interplay (two toggles cancel out, leaving the
+   * isolate as the net effect).
+   */
+  onItemDoubleClick?: (key: string) => void;
 }
+
+const HIDDEN_ITEM_OPACITY = 0.3;
 
 const DefaultLegend = memo(
   React.forwardRef<HTMLDivElement, DefaultLegendProps>(
@@ -28,6 +41,8 @@ const DefaultLegend = memo(
         isExpanded,
         setIsExpanded,
         style,
+        onItemClick,
+        onItemDoubleClick,
       },
       ref,
     ) => {
@@ -89,26 +104,61 @@ const DefaultLegend = memo(
               "openui-chart-legend--collapsed": !isExpanded && showToggleButton,
             })}
           >
-            {displayItems.map((item) => (
-              <div key={item.key} className="openui-chart-legend-item">
-                {item.icon ? (
-                  <item.icon />
-                ) : (
-                  <div
-                    className="openui-chart-legend-item-indicator"
-                    style={{ backgroundColor: item.color }}
-                  />
-                )}
-                <div className="openui-chart-legend-item-label-container">
-                  <span className="openui-chart-legend-item-label">{item.label}</span>
-                  {item.percentage !== undefined && (
-                    <span className="openui-chart-legend-item-percentage">
-                      {item.percentage.toFixed(1)}%
-                    </span>
+            {displayItems.map((item) => {
+              const isItemHidden = item.hidden === true;
+              const itemStyle: React.CSSProperties | undefined =
+                isItemHidden || onItemClick
+                  ? {
+                      ...(isItemHidden ? { opacity: HIDDEN_ITEM_OPACITY } : {}),
+                      ...(onItemClick ? { cursor: "pointer" } : {}),
+                    }
+                  : undefined;
+
+              const interactiveProps: React.HTMLAttributes<HTMLDivElement> = onItemClick
+                ? {
+                    role: "button",
+                    tabIndex: 0,
+                    "aria-pressed": !isItemHidden,
+                    "aria-label": `${item.label}; press Enter to toggle series`,
+                    onClick: () => onItemClick(item.key),
+                    onDoubleClick: onItemDoubleClick
+                      ? () => onItemDoubleClick(item.key)
+                      : undefined,
+                    onKeyDown: (event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onItemClick(item.key);
+                      }
+                    },
+                  }
+                : {};
+
+              return (
+                <div
+                  key={item.key}
+                  className="openui-chart-legend-item"
+                  style={itemStyle}
+                  {...interactiveProps}
+                >
+                  {item.icon ? (
+                    <item.icon />
+                  ) : (
+                    <div
+                      className="openui-chart-legend-item-indicator"
+                      style={{ backgroundColor: item.color }}
+                    />
                   )}
+                  <div className="openui-chart-legend-item-label-container">
+                    <span className="openui-chart-legend-item-label">{item.label}</span>
+                    {item.percentage !== undefined && (
+                      <span className="openui-chart-legend-item-percentage">
+                        {item.percentage.toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {showToggleButton && (
               <Button

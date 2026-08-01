@@ -4,6 +4,8 @@ export interface LegendItem {
   color: string;
   icon?: React.ComponentType;
   percentage?: number;
+  /** When true the series is hidden and the legend item renders dimmed. */
+  hidden?: boolean;
 }
 
 export interface StackedLegendItem {
