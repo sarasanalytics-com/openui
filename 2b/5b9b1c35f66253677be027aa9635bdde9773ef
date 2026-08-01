@@ -1,0 +1,61 @@
+packages/react-ui/src/components/Charts/index.ts
+  s_8a6841189cda28::t_2e8353067a05e0 16-18
+packages/react-ui/src/components/Charts/hooks/useCategoryVisibility.ts
+  s_8a6841189cda28::t_43735e503c1efc 54,56-59
+  s_8a6841189cda28::t_337abcb95e9830 2
+  s_8a6841189cda28::t_ff687131cd9951 20-21
+packages/react-ui/src/components/Charts/hooks/useInteractiveLegend.ts
+  s_8a6841189cda28::t_5e63e34a7cde8d 26-27
+  s_8a6841189cda28::t_d67c1628defd6c 65,67-70
+  s_8a6841189cda28::t_946aaeefb1cf98 4
+packages/react-ui/src/components/Charts/hooks/useSeriesVisibility.test.ts
+  s_8a6841189cda28::t_6f6d2f155ab80d 2-3
+  s_8a6841189cda28::t_1b4a6f7919eafb 115-264
+packages/react-ui/src/components/Charts/BarChart/BarChart.test.tsx
+  s_8a6841189cda28::t_87054e1a1f2122 127-140
+  s_8a6841189cda28::t_a2bcfe8967a80b 2
+packages/react-ui/src/components/Charts/hooks/useSeriesVisibility.ts
+  s_8a6841189cda28::t_40262d6f1c06e2 46-51,53-56
+  s_8a6841189cda28::t_df9b8000784dbb 76-100,102-103,105-107,112-113,118,122-125,127-128,130,132,134,137-139,142-145,148-151
+  s_8a6841189cda28::t_e6a71231835a82 3-22
+packages/react-ui/src/components/Charts/AreaChart/AreaChart.tsx
+  s_8a6841189cda28::t_32d05af14c61b7 13,69-74,100,125
+packages/react-ui/src/components/Charts/AreaChartCondensed/AreaChartCondensed.tsx
+  s_8a6841189cda28::t_8313bba9ce7006 16,60-65,89,114
+packages/react-ui/src/components/Charts/BarChart/BarChart.tsx
+  s_8a6841189cda28::t_fbc1ef20e2788d 14,90-95,134,190
+packages/react-ui/src/components/Charts/BarChartCondensed/BarChartCondensed.tsx
+  s_8a6841189cda28::t_46509c783ae149 17,64-69,103,126
+packages/react-ui/src/components/Charts/HorizontalBarChart/HorizontalBarChart.tsx
+  s_8a6841189cda28::t_98a5f12829e617 8-13,72-77,103,152
+packages/react-ui/src/components/Charts/LineChart/LineChart.tsx
+  s_8a6841189cda28::t_b3ee6ecb5b61ae 13,80-85,121,172
+packages/react-ui/src/components/Charts/LineChartCondensed/LineChartCondensed.tsx
+  s_8a6841189cda28::t_ab898be1e48b12 15,61-66,91,116
+packages/react-ui/src/components/Charts/PieChart/PieChart.tsx
+  s_8a6841189cda28::t_5555fd9c42b2a1 7-12,58-63,94,182
+packages/react-ui/src/components/Charts/RadarChart/RadarChart.tsx
+  s_8a6841189cda28::t_f3f3a7f0d0261f 13-18,47-52,70,95
+packages/react-ui/src/components/Charts/RadialChart/RadialChart.tsx
+  s_8a6841189cda28::t_51d319a7d2b95a 6-11,53-58,87,176
+packages/react-ui/src/components/Charts/ScatterChart/ScatterChart.tsx
+  s_8a6841189cda28::t_bb4ef7cf9af400 7-12,52-57,79,102
+packages/react-ui/src/components/Charts/SingleStackedBarChart/SingleStackedBarChart.tsx
+  s_8a6841189cda28::t_c31c1ad41f110c 5,31-36,51,94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "2b5b9b1c35f66253677be027aa9635bdde9773ef",
+  "prompts": {},
+  "sessions": {
+    "s_8a6841189cda28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0fe83c75-dfc1-456b-9deb-5fcf70f88aa9",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Venkateshwaran Selvaraj <venkateshwaran.s@sarasanalytics.com>"
+    }
+  }
+}
