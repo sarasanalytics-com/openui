@@ -20,7 +20,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4",
     "jiti": "^2.0.0",
-    "nuxt": "^3.17.0",
+    "nuxt": "^3.21.10",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vue": "^3.5.0",
