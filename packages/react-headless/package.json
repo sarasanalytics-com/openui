@@ -45,7 +45,7 @@
   "devDependencies": {
     "@types/react": "catalog:",
     "openai": "^6.22.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.11"
   },
   "keywords": [
     "openui",
